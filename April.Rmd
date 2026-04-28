@@ -1,0 +1,1542 @@
+---
+title: "Visualizations"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+date: "2026-04-10"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,       # hides code
+  message = FALSE,    # suppresses messages
+  warning = FALSE     # suppresses warnings
+)
+```
+
+# 1. Load and clean data 
+
+```{r}
+
+#load data 
+
+load("data/CLSA_methylation.rds")
+grep("GRUMPY", names(CLSA_methylation), ignore.case = TRUE, value = TRUE) #check for certain variables in the dataset 
+
+
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library (haven)
+library(table1)
+library(stargazer)
+library(htmltools)
+
+
+#create a subset 
+subset_data <- CLSA_methylation[, c(
+  "AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7",
+  
+  # Socioeconomic
+  "INC_TOT_COM", "ED_HIGH_COM", "WEA_SVNGSVL_MCQ",
+  
+  # Outcomes
+  "GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC",
+  
+  # Environmental exposures
+  "pm25_1yr_com", "no2_1yr_com", "o3_1yr_com", "GRLANYY_26_COM", "temp_1yr_com",
+  "LGTNLTYY_01_COM",   "ENV_HMPRB_CON_MCQ", "ENV_HMPRB_NOI_MCQ", "pm25_5yrs_com",   "PM25DALYY_02_COM", "no2_5yrs_com", "so2_1yr_com",
+  
+  "Locrds_length_200m_com",   "Phwy_length_200m_com", 
+  
+  "grtcc10_01_COM",   "grtcc10_02_COM",   "grtcc10_03_COM",   "grtcc10_04_COM",  "grtcc10_05_COM",   
+  "GRUMPYY_01_COM",  "GRUMPYY_02_COM", "GRUMPYY_03_COM",   "GRUMPYY_04_COM",   "GRUMPYY_05_COM",   "GRUMPYY_06_COM",   "GRUMPYY_07_COM",
+  "GRUMPYY_08_COM",   "GRUMPYY_09_COM",
+  
+  
+  # Lifestyle / behavioral
+  "PA2_DSCR2_MCQ", "ALC_FREQ_COM", "ICQ_SMOKE_COM", #PASE scale: PASE Score - Final (in sharepoint dictionary)
+  
+  #cell types
+  "CD4nv", "CD8nv",   "Mono", "Treg", "CD4mem", "CD8mem", "NK", "Bmem", "Bnv"
+  
+)]
+
+colSums(is.na(subset_data))#check number of NAs
+#savings 103; education 229; noise 76; condensation 76; pa2 76; alcohol 36
+
+
+```
+
+
+
+
+## 1.1 Recode missing values to N/A
+
+```{r}
+
+str(subset_data$pm25_1yr_com) #numeric
+str(subset_data$no2_1yr_com) #numeric
+str(subset_data$o3_1yr_com) #numeric
+str(subset_data$GRLANYY_26_COM) #numeric
+str(subset_data$temp_1yr_com) #numeric
+str(subset_data$LGTNLTYY_01_COM) #light is an integer 
+subset_data$LGTNLTYY_01_COM <- as.numeric(subset_data$LGTNLTYY_01_COM) #make light numeric
+
+
+subset_data$pm25_1yr_com[subset_data$pm25_1yr_com == -8888] <- NA  #recode =8888 to missing for these variables 
+subset_data$pm25_5yrs_com[subset_data$pm25_5yrs_com == -8888] <- NA  #recode =8888 to missing for these variables 
+subset_data$no2_1yr_com[subset_data$no2_1yr_com == -8888] <- NA #NO2
+subset_data$so2_1yr_com[subset_data$so2_1yr_com == -8888] <- NA #NO2
+subset_data$o3_1yr_com[subset_data$o3_1yr_com == -8888] <- NA #ozone
+subset_data$GRLANYY_26_COM[subset_data$GRLANYY_26_COM == -8888] <- NA #greeness
+subset_data$LGTNLTYY_01_COM[subset_data$LGTNLTYY_01_COM == -8888] <- NA #light 
+subset_data$temp_1yr_com[subset_data$temp_1yr_com == -8888] <- NA#temperature
+subset_data$Locrds_length_200m_com[subset_data$Locrds_length_200m_com == -8888] <- NA#length of roads within 200m
+subset_data$Phwy_length_200m_com[subset_data$Phwy_length_200m_com == -8888] <- NA#length of hwy within 200m
+
+subset_data$grtcc10_01_COM[subset_data$grtcc10_01_COM %in% c(-8888, -9999)] <- NA
+subset_data$grtcc10_02_COM[subset_data$grtcc10_02_COM %in% c(-8888, -9999)] <- NA
+subset_data$grtcc10_03_COM[subset_data$grtcc10_03_COM %in% c(-8888, -9999)] <- NA
+subset_data$grtcc10_04_COM[subset_data$grtcc10_04_COM %in% c(-8888, -9999)] <- NA
+subset_data$grtcc10_05_COM[subset_data$grtcc10_05_COM %in% c(-8888, -9999)] <- NA
+
+subset_data$GRUMPYY_01_COM[subset_data$GRUMPYY_01_COM %in% c(-8888, -9999)] <- NA
+subset_data$GRUMPYY_02_COM[subset_data$GRUMPYY_02_COM %in% c(-8888, -9999)] <- NA
+subset_data$GRUMPYY_03_COM[subset_data$GRUMPYY_03_COM %in% c(-8888, -9999)] <- NA
+subset_data$GRUMPYY_04_COM[subset_data$GRUMPYY_04_COM %in% c(-8888, -9999)] <- NA
+subset_data$GRUMPYY_05_COM[subset_data$GRUMPYY_05_COM %in% c(-8888, -9999)] <- NA
+subset_data$GRUMPYY_06_COM[subset_data$GRUMPYY_06_COM %in% c(-8888, -9999)] <- NA
+subset_data$GRUMPYY_07_COM[subset_data$GRUMPYY_07_COM %in% c(-8888, -9999)] <- NA
+subset_data$GRUMPYY_08_COM[subset_data$GRUMPYY_08_COM %in% c(-8888, -9999)] <- NA
+subset_data$GRUMPYY_09_COM[subset_data$GRUMPYY_09_COM %in% c(-8888, -9999)] <- NA
+
+```
+
+
+
+
+## 1.2 Reverse code Household Income, Savings
+
+```{r}
+#SEC 
+#household income
+table(subset_data$INC_TOT_COM, useNA = "ifany")#categories are 1,2,3,4,5,8,9. 8="Don't know/No answer", 9=refused. 7=missing but there are none of these. 
+
+#before reversing:
+# 1 = Less than $20,000; 2 = $20,000–$49,999; 3 = $50,000–$99,999; 4 = $100,000–$149,999; 5 = $150,000 or more; 7 = Missing; 8 = Don't know/No answer; 9 = Refused
+
+#after reversing: 
+# 1 = $150,000 or more ; 2 = $100,000–$149,999 ; 3 = $50,000–$99,999; 4 = $20,000–$49,999; 5 = Less than $20,000; 6=  Don't know/No answer/Refused
+
+subset_data$INC_TOT_COM_RECODED <- dplyr::case_when( #reverse code so that 1=5, 2=4, 3=3, 4=2, 5=1, and 6=8,9 
+  subset_data$INC_TOT_COM == 1 ~ 5,
+  subset_data$INC_TOT_COM == 2 ~ 4,
+  subset_data$INC_TOT_COM == 3 ~ 3,
+  subset_data$INC_TOT_COM == 4 ~ 2,
+  subset_data$INC_TOT_COM == 5 ~ 1,
+  subset_data$INC_TOT_COM %in% c(8, 9) ~ 6,
+  TRUE ~ NA_real_   
+)
+table(subset_data$INC_TOT_COM_RECODED)
+subset_data$INC_TOT_COM <- subset_data$INC_TOT_COM_RECODED
+sum(is.na(subset_data$INC_TOT_COM)) #number of NAs is 0
+
+
+#savings 
+table(subset_data$WEA_SVNGSVL_MCQ, useNA = "ifany") #categories are #1 = Less than $50,000; 2 = $50,000–$99,999; 3 = $100,000–$999,999; 4 = $1 million or more; 8 = Don’t know/No answer; 9 = Refused
+#there are 103 NAs to start with. 
+
+subset_data$WEA_SVNGSVL_MCQ_RECODED <- dplyr::case_when( #reverse code so that 1=4, 2=3, 3=2, 4=1, 5=8,9 
+  subset_data$WEA_SVNGSVL_MCQ == 1 ~ 4,
+  subset_data$WEA_SVNGSVL_MCQ == 2 ~ 3,
+  subset_data$WEA_SVNGSVL_MCQ == 3 ~ 2,
+  subset_data$WEA_SVNGSVL_MCQ == 4 ~ 1,
+  subset_data$WEA_SVNGSVL_MCQ %in% c(8, 9) ~ 5,
+  TRUE ~ NA_real_   
+)
+subset_data$WEA_SVNGSVL_MCQ <- subset_data$WEA_SVNGSVL_MCQ_RECODED
+table(subset_data$WEA_SVNGSVL_MCQ, useNA = "ifany")#103 NAs 
+
+
+#education 
+# Step 1: Coerce to numeric safely (from character/factor labels)
+# Step 2: Set invalid categories to NA (97 = other, 98 = don't know, 99 = refused)
+# Step 3: Reverse code only valid numeric values (1–6)
+# Step 4: Convert to factor
+# Step 5: Optional – drop unused factor levels (e.g., if -90 or others existed)
+# Step 6: Check
+#check NAs
+
+table(subset_data$ED_HIGH_COM)
+subset_data$ED_HIGH_COM <- as.numeric(as.character(subset_data$ED_HIGH_COM))
+subset_data$ED_HIGH_COM[subset_data$ED_HIGH_COM %in% c(97, 98, 99)] <- NA
+subset_data$ED_HIGH_COM <- ifelse(!is.na(subset_data$ED_HIGH_COM), 7 - subset_data$ED_HIGH_COM, NA)
+subset_data$ED_HIGH_COM <- factor(subset_data$ED_HIGH_COM)
+subset_data$ED_HIGH_COM <- droplevels(subset_data$ED_HIGH_COM)
+table(subset_data$ED_HIGH_COM, useNA = "ifany") #231 NAs 
+
+saveRDS(subset_data, file = "subset_data.rds")
+
+```
+
+
+## 1.3 Reference info about variable names (new enviro variables) 
+
+
+Tree canopy:
+grtcc10_01_COM: Estimated percent of pixel covered by vegetation greater than 5m in height (2010)
+grtcc10_02_COM: Average of estimated percent of pixel covered by vegetation greater than 5m in height within 100m (2010)
+grtcc10_03_COM: Average of estimated percent of pixel covered by vegetation greater than 5m in height within 250m (2010)
+grtcc10_04_COM: Average of estimated percent of pixel covered by vegetation greater than 5m in height within 500m (2010)
+grtcc10_05_COM: Average of estimated percent of pixel covered by vegetation greater than 5m in height within 1 km (2010)
+
+
+
+
+# 2.0 Descriptive overview of sample 
+## 2.1 Demographics (age, sex, ethnicity) 
+
+
+```{r}
+
+subset_data <- readRDS("subset_data.rds")
+library(ggplot2)
+
+# age and sex  ------------------------------------------------------
+
+#pie chart for sex
+df_sex <- subset_data %>%
+  filter(!is.na(SEX_ASK_COM)) %>%
+  count(SEX_ASK_COM) %>%
+  mutate(
+    percent = n / sum(n),
+    label = paste0(SEX_ASK_COM, " (", round(percent * 100, 1), "%)")
+  )
+
+ggplot(df_sex, aes(x = 1, y = n, fill = SEX_ASK_COM)) +
+  geom_col(width = 1, color = "white", linewidth = 1) +
+  coord_polar(theta = "y") +
+  geom_text(
+    aes(label = label),
+    position = position_stack(vjust = 0.5),
+    size = 10,              # big, slide-friendly
+    fontface = "plain"
+  ) +
+  scale_fill_manual(values = c("F" = "#1f77b4", "M" = "#ff7f0e")) +
+  labs(title = "Sex Distribution", x = NULL, y = NULL, fill = NULL) +
+  theme_void() +
+  theme(
+    # remove any remaining axis/radial artifacts
+    axis.line = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face  = "bold",
+      size  = 38,
+      margin = margin(b = 18)
+    ),
+    
+    legend.position = "right",
+    legend.text = element_text(size = 26),
+    legend.key.size = grid::unit(1.2, "lines")
+  )
+
+
+#age boxplot 
+subset_data %>%
+  filter(!is.na(AGE_NMBR_COM)) %>%
+  ggplot(aes(x = "", y = AGE_NMBR_COM)) +
+  geom_boxplot(
+    width = 0.25,
+    fill = "white",
+    color = "#2C7FB8",
+    linewidth = 1.2
+  ) +
+  scale_y_continuous(
+    breaks = seq(
+      floor(min(subset_data$AGE_NMBR_COM, na.rm = TRUE) / 5) * 5,
+      ceiling(max(subset_data$AGE_NMBR_COM, na.rm = TRUE) / 5) * 5,
+      by = 5
+    )
+  ) +
+  labs(
+    title = "Age Distribution",
+    x = NULL,
+    y = "Age (years)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust  = 0.5,
+      face   = "bold",
+      size   = 38,
+      margin = margin(b = 18)
+    ),
+    axis.title.y = element_text(
+      face   = "bold",
+      size   = 30,
+      margin = margin(r = 16)
+    ),
+    axis.title.x = element_blank(),
+    axis.text.y  = element_text(size = 26),
+    axis.text.x  = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_line(linetype = "dotted"),
+    panel.grid.major.y = element_line(linetype = "dashed"),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA)
+  )
+
+
+ggsave("age_distribution.png", width = 12, height = 7, dpi = 600)
+
+# categories of cultural background:"White", "South Asian", "Black", "Asian","Arab", "Latin American", "Other"
+subset_data %>%
+  count(Race7) %>%
+  mutate(
+    percent = round(100 * n / sum(n), 1)
+  )
+
+  
+```
+
+```{r}
+#Custom theme for all figures
+
+report_theme <- theme_classic(base_size = 11) +
+  theme(
+    legend.position = "none",
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face  = "bold",
+      size  = 13,
+      margin = margin(b = 8)
+    ),
+    
+    axis.title.x = element_text(
+      face = "bold",
+      size = 11,
+      margin = margin(t = 6)
+    ),
+    axis.title.y = element_text(
+      face = "bold",
+      size = 11,
+      margin = margin(r = 6)
+    ),
+    
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10)
+  )
+
+
+# ethnicity/self reported background barplot 
+p_ethnicity <- subset_data %>%
+  filter(!is.na(Race7)) %>%
+  count(Race7, name = "n") %>%
+  arrange(n) %>%
+  ggplot(aes(x = n, y = Race7)) +
+  geom_col(fill = "#2C7FB8", width = 0.7) +
+  labs(
+    title = "Self-Reported Cultural Background",
+    x = "Number of Participants",
+    y = NULL
+  ) +
+  report_theme
+
+ggsave("Figures/ethnicity_barplot.png", plot = p_ethnicity, width = 5, height = 4, dpi = 300)
+```
+
+
+
+
+## 2.2 Socioeconomic variables: Household Income and Wealth 
+
+```{r}
+#after reversing: 
+# 1 = $150,000 or more ; 2 = $100,000–$149,999 ; 3 = $50,000–$99,999; 4 = $20,000–$49,999; 5 = Less than $20,000; 6=  Don't know/No answer/Refused
+
+subset_data %>%
+  count(INC_TOT_COM) %>%
+  mutate(
+    percent = round(100 * n / sum(n), 1)
+  )
+
+
+#savings categories after reverse code are: 1=1 million or more. 2=100k to 1 million. 3=50-100k. 4=<50K. 5=don't know/no answer/refused 
+subset_data %>%
+  count(WEA_SVNGSVL_MCQ) %>%
+  mutate(
+    percent = round(100 * n / sum(n), 1)
+  )
+```
+
+
+```{r}
+
+# household income barplot 
+p_income <- subset_data %>%
+  mutate(
+    income_cat = factor(
+      INC_TOT_COM,
+      levels = c(1, 2, 3, 4, 5, 7, 8, 9),
+      labels = c(
+        "<20K",
+        "20K–50K",
+        "50K–100K",
+        "100K–150K",
+        "150K+",
+        "Missing",
+        "Don't know/No answer",
+        "Refused"
+      )
+    )
+  ) %>%
+  count(income_cat, name = "n") %>%
+  arrange(n) %>%
+  ggplot(aes(x = n, y = income_cat)) +
+  geom_col(fill = "#2C7FB8", width = 0.7) +
+  labs(
+    title = "Household Income (Past 12 Months)",
+    x = "Number of Participants",
+    y = NULL
+  ) +
+  report_theme
+
+ggsave("Figures/household_income_barplot.png", plot = p_income, width = 5, height = 4, dpi = 300)
+
+
+# savings/wealth barplot 
+p_wealth <- subset_data %>%
+  mutate(
+    wealth_cat = factor(
+      WEA_SVNGSVL_MCQ,
+      levels = c(1, 2, 3, 4, 8, 9),
+      labels = c(
+        "<50K",
+        "50K–100K",
+        "100K to <$1M",
+        "$1M+",
+        "Don't know/No answer",
+        "Refused"
+      )
+    )
+  ) %>%
+  count(wealth_cat, name = "n") %>%
+  arrange(n) %>%
+  ggplot(aes(x = n, y = wealth_cat)) +
+  geom_col(fill = "#2C7FB8", width = 0.7) +
+  labs(
+    title = "Total Savings and Investments",
+    x = "Number of Participants",
+    y = NULL
+  ) +
+  report_theme
+
+ggsave("Figures/savings_barplot.png", plot = p_wealth, width = 5, height = 4, dpi = 300)
+
+
+```
+
+
+
+# 3.0 Environmental Variables 
+
+##3.1 Pollution variables 
+
+
+```{r}
+ft <- flextable(summary_table) %>%
+  add_header_lines("Table X. Air Quality Exposures") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%  # title slightly bigger
+  bold(i = 1, part = "header") %>%                 # title bold
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%  # title centered
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
+
+save_as_image(ft, path = "Tables/Table_airquality.png", res = 300)
+```
+
+
+
+
+## 3.2 Greenness and condensation/noise
+
+```{r}
+vars_ndvi <- list(
+  list(col = "GRLANYY_26_COM", label = "Maximum annual mean NVDI within 250m")
+)
+
+summary_table_ndvi <- lapply(vars_ndvi, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable            = v$label,
+    `Mean (SD)`         = paste0(round(mean(x, na.rm=TRUE), 2), " (", round(sd(x, na.rm=TRUE), 2), ")"),
+    `Median [Min, Max]` = paste0(round(median(x, na.rm=TRUE), 2), " [", round(min(x, na.rm=TRUE), 2), ", ", round(max(x, na.rm=TRUE), 2), "]"),
+    `Missing`           = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_ndvi <- flextable(summary_table_ndvi) %>%
+  add_header_lines("Table X. Normalized Difference Vegetation Index (NDVI)") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_ndvi, path = "Tables/Table_ndvi.png", res = 300)
+```
+
+
+
+## 3.3 Condensation and noise 
+
+```{r}
+vars_housing <- list(
+  list(col = "ENV_HMPRB_CON_MCQ", label = "Condensation"),
+  list(col = "ENV_HMPRB_NOI_MCQ", label = "Noise")
+)
+
+summary_table_housing <- lapply(vars_housing, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable  = v$label,
+    `Yes n (%)` = paste0(sum(x == 1, na.rm=TRUE), " (", round(mean(x == 1, na.rm=TRUE)*100, 1), "%)"),
+    `No n (%)`  = paste0(sum(x == 0, na.rm=TRUE), " (", round(mean(x == 0, na.rm=TRUE)*100, 1), "%)"),
+    `Missing`   = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_housing <- flextable(summary_table_housing) %>%
+  add_header_lines("Table X. Problems with Housing") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Yes n (%)", "No n (%)", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_housing, path = "Tables/Table_housing.png", res = 300)
+```
+
+
+## 3.4 Length of roads within 200m 
+
+```{r}
+vars_roads <- list(
+  list(col = "Phwy_length_200m_com",   label = "Length of highways within 200m of postal code (m)"),
+  list(col = "Locrds_length_200m_com", label = "Length of local roads within 200m of postal code (m)")
+)
+
+summary_table_roads <- lapply(vars_roads, function(v) {
+  x <- subset_data[[v$col]]
+  n_zero_or_missing <- sum(x == 0 | is.na(x), na.rm = TRUE)
+  pct_zero_or_missing <- round(n_zero_or_missing / length(x) * 100, 1)
+  
+  x_filtered <- x[x > 0 & !is.na(x)]  # remove zeros and NAs for stats
+  
+  tibble(
+    Variable                = v$label,
+    `Mean (SD)`             = paste0(round(mean(x_filtered), 2), " (", round(sd(x_filtered), 2), ")"),
+    `Median [Min, Max]`     = paste0(round(median(x_filtered), 2), " [", round(min(x_filtered), 2), ", ", round(max(x_filtered), 2), "]"),
+    `Zero or Missing n (%)` = paste0(n_zero_or_missing, " (", pct_zero_or_missing, "%)")
+  )
+}) %>% bind_rows()
+
+ft_roads <- flextable(summary_table_roads) %>%
+  add_header_lines("Table X. Proximity to Roads") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Zero or Missing n (%)"), align = "center", part = "body")
+
+save_as_image(ft_roads, path = "Tables/Table_roads.png", res = 300)
+```
+
+
+```{r}
+summary(subset_data$Phwy_length_200m_com) #Length of hwy within 200m of postal code centre
+quantile(subset_data$Phwy_length_200m_com,
+         probs = c(0, .01, .05, .10, .25, .50, .75, .90, .95, .99),
+         na.rm = TRUE)
+mean(subset_data$Phwy_length_200m_com == 0, na.rm = TRUE) #96% of the participants (1423 participants) have no hwy nearby. 
+
+
+
+summary(subset_data$Locrds_length_200m_com) #Length of local rds within 200m of postal code centre
+quantile(subset_data$Locrds_length_200m_com,
+         probs = c(0, .01, .05, .10, .25, .50, .75, .90, .95, .99),
+         na.rm = TRUE) 
+
+hist(subset_data$Locrds_length_200m_com,
+     breaks = 50,
+     main = "Length of local rds within 200 m",
+     xlab = "Meters",
+     col = "grey")
+
+
+```
+
+
+## 3.5 Canopy coverage and % vegetation 
+```{r}
+# Table 1 - Tree Canopy Coverage
+vars_canopy <- list(
+  list(col = "grtcc10_01_COM", label = "Mean % of pixel covered by vegetation >5m"),
+  list(col = "grtcc10_02_COM", label = "Mean % of pixel covered by vegetation >5m, within 100m"),
+  list(col = "grtcc10_03_COM", label = "Mean % of pixel covered by vegetation >5m, within 250m"),
+  list(col = "grtcc10_04_COM", label = "Mean % of pixel covered by vegetation >5m, within 500m"),
+  list(col = "grtcc10_05_COM", label = "Mean % of pixel covered by vegetation >5m, within 1km")
+)
+
+summary_table_canopy <- lapply(vars_canopy, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable            = v$label,
+    `Mean (SD)`         = paste0(round(mean(x, na.rm=TRUE), 2), " (", round(sd(x, na.rm=TRUE), 2), ")"),
+    `Median [Min, Max]` = paste0(round(median(x, na.rm=TRUE), 2), " [", round(min(x, na.rm=TRUE), 2), ", ", round(max(x, na.rm=TRUE), 2), "]"),
+    `Missing`           = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_canopy <- flextable(summary_table_canopy) %>%
+  add_header_lines("Table X. Tree Canopy Coverage") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_canopy, path = "Tables/Table_treecanopy.png", res = 300)
+
+# Table 2 - Vegetative Greenness
+vars_greenness <- list(
+  list(col = "GRUMPYY_01_COM", label = "Mean of annual % vegetative greenness, At postal code"),
+  list(col = "GRUMPYY_02_COM", label = "Mean of annual % vegetative greenness, within 100m"),
+  list(col = "GRUMPYY_03_COM", label = "Mean of annual % vegetative greenness, within 250m"),
+  list(col = "GRUMPYY_04_COM", label = "Mean of annual % vegetative greenness, within 500m"),
+  list(col = "GRUMPYY_05_COM", label = "Mean of annual % vegetative greenness, within 1km"),
+  list(col = "GRUMPYY_06_COM", label = "Max of annual % vegetative greenness, within 100m"),
+  list(col = "GRUMPYY_07_COM", label = "Max of annual % vegetative greenness, within 250m"),
+  list(col = "GRUMPYY_08_COM", label = "Max of annual % vegetative greenness, within 500m"),
+  list(col = "GRUMPYY_09_COM", label = "Max of annual % vegetative greenness, within 1km")
+)
+
+summary_table_greenness <- lapply(vars_greenness, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable            = v$label,
+    `Mean (SD)`         = paste0(round(mean(x, na.rm=TRUE), 2), " (", round(sd(x, na.rm=TRUE), 2), ")"),
+    `Median [Min, Max]` = paste0(round(median(x, na.rm=TRUE), 2), " [", round(min(x, na.rm=TRUE), 2), ", ", round(max(x, na.rm=TRUE), 2), "]"),
+    `Missing`           = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_greenness <- flextable(summary_table_greenness) %>%
+  add_header_lines("Table X. Percent Vegetative Greenness") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_greenness, path = "Tables/Table_percentveg.png", res = 300)
+```
+
+
+
+```{r}
+
+library(table1)
+library(Hmisc)
+library(htmltools)
+library(webshot2)
+
+
+# percent of pixel covered 
+label(subset_data$grtcc10_01_COM)  <- "Mean % of pixel covered"
+label(subset_data$grtcc10_02_COM)  <- "Mean % of pixel covered, within 100m"
+label(subset_data$grtcc10_03_COM)  <- "Mean % of pixel covered, within 250m"
+label(subset_data$grtcc10_04_COM)  <- "Mean % of pixel covered, within 500m"
+label(subset_data$grtcc10_05_COM)  <- "Mean % of pixel covered, within 1km"
+
+
+table_canopycoverage <- table1(~ grtcc10_01_COM + grtcc10_02_COM + grtcc10_03_COM + grtcc10_04_COM + grtcc10_05_COM, data = subset_data,   
+                              caption = "<b>Table X. Percent of pixel covered by vegetation > 5 metres</b>"
+)
+
+
+# Save as HTML then screenshot at high resolution
+html_file <- "Figures/Table_canopycoverage.html"
+
+save_html(
+  tags$html(
+    tags$head(tags$style("
+      body { zoom: 1.5; font-size: 22px; }
+      table { width: 100% !important; font-size: 15px; }
+      td, th { padding: 10px 16px !important; }
+      .table1 { font-size: 20px !important; }
+      caption { font-size: 20px !important; font-weight: bold; }
+    ")),
+    tags$body(HTML(as.character(table_canopycoverage)))
+  ),
+  file = html_file
+)
+
+webshot(html_file,
+        file = "Figures/Table_canopycoverage.png",
+        vwidth = 1200,    # wide viewport
+        vheight = 800,
+        zoom = 2)   
+
+
+
+
+# % vegetative greenness 
+label(subset_data$GRUMPYY_01_COM)  <- "Annual % vegetative greenness at postal code"
+label(subset_data$GRUMPYY_02_COM)  <- "Mean of annual % of vegetative greenness within 100m"
+label(subset_data$GRUMPYY_03_COM)  <- "Mean of annual % of vegetative greenness within 250m" 
+label(subset_data$GRUMPYY_04_COM)  <- "Mean of annual % of vegetative greenness within 500m"
+label(subset_data$GRUMPYY_05_COM)  <- "Mean of annual % of vegetative greenness within 1km"
+label(subset_data$GRUMPYY_06_COM)  <- "Max of annual % of vegetative greenness within 100m" 
+label(subset_data$GRUMPYY_07_COM)  <- "Max of annual % of vegetative greenness within 250m" 
+label(subset_data$GRUMPYY_08_COM)  <- "Max of annual % of vegetative greenness within 500m" 
+label(subset_data$GRUMPYY_09_COM)  <- "Max of annual % of vegetative greenness within 1km" 
+
+
+table_pixelcoverage <- table1(~ GRUMPYY_01_COM +  GRUMPYY_02_COM + GRUMPYY_03_COM + GRUMPYY_04_COM + 
+         GRUMPYY_05_COM + GRUMPYY_06_COM + GRUMPYY_07_COM + GRUMPYY_08_COM + GRUMPYY_09_COM, data = subset_data, 
+                                       caption = "<b>Table X. Percent of green vegetation within pixel</b>"
+)
+
+
+
+# Save as HTML then screenshot at high resolution
+html_file <- "Figures/Table_pixelcoverage.html"
+
+save_html(
+  tags$html(
+    tags$head(tags$style("
+      body { zoom: 1.5; font-size: 22px; }
+      table { width: 100% !important; font-size: 20px; }
+      td, th { padding: 10px 16px !important; }
+      .table1 { font-size: 20px !important; }
+      caption { font-size: 24px !important; font-weight: bold; }
+    ")),
+    tags$body(HTML(as.character(table_pixelcoverage)))
+  ),
+  file = html_file
+)
+
+# Convert HTML → PNG
+webshot(html_file,
+        file = "Figures/Table_pixelcoverage.png",
+        vwidth = 1200,
+        vheight = 800,
+        zoom = 2)
+
+
+```
+
+
+
+
+
+
+# 4.0 Aging outcome variables: summary stats 
+
+```{r}
+#all numeric, no NAs 
+str(subset_data$GrimAge_EAA) 
+str(subset_data$PhenoAge_EAA) 
+str(subset_data$DunedinPACE) 
+str(subset_data$DNAmIC) 
+```
+
+
+
+
+# 5.0 Environmental variables by income (Pollution, condensation) 
+
+## 5.1 Pollution by income 
+```{r}
+
+#pollution boxplots by income group 
+
+
+# Shared income labels
+income_labels <- c(
+  "<20K",
+  "20K–50K",
+  "50K–100K",
+  "100K–150K",
+  "150K+"
+)
+
+ggplot(df, aes(x = income_cat, y = pm25_1yr_com)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "PM2.5 1 y average, by Income Group",
+    x = "Household Income",
+    y = "PM2.5 (µg/m³)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_pm25.png", width = 5, height = 4, dpi = 300)
+
+
+
+ggplot(df_no2, aes(x = income_cat, y = no2_1yr_com)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "NO2 1 y average, by Income Group",
+    x = "Household Income",
+    y = "NO2 (ppb)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_no2.png", width = 5, height = 4, dpi = 300)
+
+
+
+ggplot(df_so2, aes(x = income_cat, y = so2_1yr_com)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "SO2 1 y average, by Income Group",
+    x = "Household Income",
+    y = "SO2 (ppb)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_so2.png", width = 5, height = 4, dpi = 300)
+
+
+
+ggplot(df_o3, aes(x = income_cat, y = o3_1yr_com)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "Ozone 1 y average, by Income Group",
+    x = "Household Income",
+    y = "Ozone (ppb)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_o3.png", width = 5, height = 4, dpi = 300)
+
+
+ggplot(df_greenness, aes(x = income_cat, y = GRLANYY_26_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "Max NDVI within 500m, by Income Group",
+    x = "Household Income",
+    y = "Greenness (NDVI)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_ndvi.png", width = 5, height = 4, dpi = 300)
+
+
+
+
+```
+
+
+## 5.2 Condensation by income 
+
+```{r}
+#condensation by income
+
+ggplot(cond_counts, aes(x = income_cat, y = n)) +
+  geom_col(fill = "#2C7FB8", width = 0.6) +
+  geom_text(
+    aes(label = paste0(n, " (", percent(pct, accuracy = 0.1), ")")),
+    vjust = -0.35,
+    size = 3.2  # scaled to base_size 11 theme
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(
+    title = "Homes with Condensation, by Income Group",
+    x = "Household Income",
+    y = "Homes with Condensation"
+  ) +
+  report_theme
+
+ggsave("Figures/barplot_condensation.png", width = 5, height = 4, dpi = 300)
+
+```
+
+
+
+
+
+## 5.3 Tree canopy coverage by income 
+
+```{r}
+
+#tree canopy by income, boxplots 
+p_veg1 <- ggplot(df, aes(x = income_cat, y = grtcc10_01_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(title = "Vegetation Cover (>5m) by Income Group",
+       x = "Household Income", y = "% Pixel Covered by Vegetation >5m") +
+  report_theme
+ggsave("Figures/boxplot_vegetation_01.png", plot = p_veg1, width = 5, height = 4, dpi = 300)
+
+
+p_veg2 <- ggplot(df, aes(x = income_cat, y = grtcc10_02_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(title = "Vegetation Cover (>5m) by Income, 100m",
+       x = "Household Income", y = "% Pixel Covered by Vegetation >5m") +
+  report_theme
+ggsave("Figures/boxplot_vegetation_02.png", plot = p_veg2, width = 5, height = 4, dpi = 300)
+
+
+p_veg3 <- ggplot(df, aes(x = income_cat, y = grtcc10_03_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(title = "Vegetation Cover (>5m) by Income, 250m",
+       x = "Household Income", y = "% Pixel Covered by Vegetation >5m") +
+  report_theme
+ggsave("Figures/boxplot_vegetation_03.png", plot = p_veg3, width = 5, height = 4, dpi = 300)
+
+
+p_veg4 <- ggplot(df, aes(x = income_cat, y = grtcc10_04_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(title = "Vegetation Cover (>5m) by Income, 500m",
+       x = "Household Income", y = "% Pixel Covered by Vegetation >5m") +
+  report_theme
+ggsave("Figures/boxplot_vegetation_04.png", plot = p_veg4, width = 5, height = 4, dpi = 300)
+
+
+p_veg5 <- ggplot(df, aes(x = income_cat, y = grtcc10_05_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(title = "Vegetation Cover (>5m) by Income, 1km",
+       x = "Household Income", y = "% Pixel Covered by Vegetation >5m") +
+  report_theme
+ggsave("Figures/boxplot_vegetation_05.png", plot = p_veg5, width = 5, height = 4, dpi = 300)
+
+
+
+
+
+df <- subset_data %>%
+  filter(INC_TOT_COM %in% 1:5, !is.na(grtcc10_01_COM)) %>%
+  mutate(
+    income_cat = factor(INC_TOT_COM, levels = 1:5, labels = income_labels)
+  )
+
+ggplot(df, aes(x = income_cat, y = grtcc10_01_COM)) +
+  geom_boxplot(
+    fill = "#2C7FB8",
+    outlier.alpha = 0.5,
+    width = 0.6
+  ) +
+  labs(
+    title = "Vegetation Cover (>5m) by Income Group",
+    x = "Household Income",
+    y = "Estimated % Pixel Covered by Vegetation >5m"
+  ) +
+  theme_classic(base_size = 26) +
+  theme(
+    legend.position = "none",
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face  = "bold",
+      size  = 38,
+      margin = margin(b = 18)
+    ),
+    
+    axis.title.x = element_text(
+      face = "bold",
+      size = 30,
+      margin = margin(t = 16)
+    ),
+    axis.title.y = element_text(
+      face = "bold",
+      size = 30,
+      margin = margin(r = 16)
+    ),
+    
+    axis.text.x = element_text(size = 26),
+    axis.text.y = element_text(size = 26)
+  )
+```
+
+
+
+
+
+## 5.4 Vegetative greenness fractions by income 
+
+
+## 5.5 Road length (nearby) by income 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Sample regressions for presentation? 
+
+
+```{r}
+#factor variables 
+str(subset_data %>%
+      dplyr::select(
+        pm25_1yr_com,
+        INC_TOT_COM,
+        SEX_ASK_COM,
+        AGE_NMBR_COM,
+        WGHTS_PROV_COM,
+        Race7
+      ))
+
+subset_data <- subset_data %>%
+  mutate(
+    INC_TOT_COM_factor     = factor(INC_TOT_COM),
+    SEX_ASK_COM_factor     = factor(SEX_ASK_COM),
+    WGHTS_PROV_COM_factor  = factor(WGHTS_PROV_COM)
+  )
+
+model <- lm(so2_1yr_com ~ INC_TOT_COM_factor + SEX_ASK_COM_factor + AGE_NMBR_COM + #PM2.5
+              WGHTS_PROV_COM_factor + Race7,
+            data = subset_data)
+summary(model)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "Results1.csv", row.names = FALSE)
+
+
+
+model <- lm(GRLANYY_26_COM ~ INC_TOT_COM_factor + SEX_ASK_COM_factor + AGE_NMBR_COM + #GRLANYY_26_COM
+              WGHTS_PROV_COM_factor + Race7,
+            data = subset_data)
+summary(model)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "Results9.csv", row.names = FALSE)
+
+```
+
+
+
+# Not using yet 
+
+
+
+## Table1 of All variables (Summary Stats)
+```{r}
+
+# Table1 all the variables (label and make into factor first)  -----------------------------------------------
+
+#demographic variables age, sex, race 
+subset_data$AGE_NMBR_COM <- as.numeric(subset_data$AGE_NMBR_COM) 
+subset_data$SEX_ASK_COM <- factor(subset_data$SEX_ASK_COM) #F is first 
+subset_data$WGHTS_PROV_COM <- factor(subset_data$WGHTS_PROV_COM) #AB is first 
+subset_data$Race7 <- factor(subset_data$Race7,
+                            levels = c("White", "South Asian", "Black", "Asian",
+                                       "Arab", "Other")) #White is reference
+
+label(subset_data$SEX_ASK_COM) <- "Sex (M/F)"#label categorical variables 
+label(subset_data$AGE_NMBR_COM) <- "Age (years)"
+label(subset_data$Race7) <- "Cultural background"
+
+table1(~ SEX_ASK_COM + AGE_NMBR_COM + Race7, data = subset_data)
+
+#SEC variables 
+table(subset_data$INC_TOT_COM)
+subset_data$INC_TOT_COM_factored <- factor(subset_data$INC_TOT_COM,#household income
+                                                levels = c(1, 2, 3, 4, 5),
+                                                labels = c("150K+",
+                                                      "100K to 150K",
+                                                      "50K–100K",
+                                                      "20K-50K",
+                                                      "<20K"))
+                           
+
+table(subset_data$ED_HIGH_COM)
+subset_data$ED_HIGH_COM_factored <- factor(subset_data$ED_HIGH_COM,#education
+                                                levels = c(1, 2, 3, 4, 5, 6),
+                                                labels = c("01 = Above bachelor’s degg",
+                                                           "02 = Bachelor’s deg",
+                                                           "03 = Uni cert below bachelor’s",
+                                                           "04 = Non-univ college diplomas",
+                                                           "05 = Trade cert/diploma",
+                                                           "06 = Above bachelor’s deg"))
+
+
+table(subset_data$WEA_SVNGSVL_MCQ)
+subset_data$WEA_SVNGSVL_MCQ_factored <- factor(subset_data$WEA_SVNGSVL_MCQ,#savings
+                                                    levels = c(1, 2, 3, 4, 5),
+                                                    labels = c("$1 million +", 
+                                                               "100K to <$1 million",
+                                                               "50K–100K",
+                                                               "<50K",
+                                                               "Don't know/No answer/Refused"
+                                                               ))
+
+
+
+label(subset_data$INC_TOT_COM_factored)          <- "Total Household Income (past 12 months)"
+label(subset_data$ED_HIGH_COM_factored)           <- "Highest Education Obtained"
+label(subset_data$WEA_SVNGSVL_MCQ_factored)       <- "Total Savings and Investments"
+
+table1(~ INC_TOT_COM_factored + ED_HIGH_COM_factored + WEA_SVNGSVL_MCQ_factored, data = subset_data)
+
+
+
+#environmental variables 
+
+table(subset_data$ENV_HMPRB_CON_MCQ)
+subset_data$ENV_HMPRB_CON_MCQ_factored <- factor(subset_data$ENV_HMPRB_CON_MCQ,#condensation
+                                                      levels = c(0, 1),
+                                                      labels = c("No", "Yes"))
+
+table(subset_data$ENV_HMPRB_NOI_MCQ)
+subset_data$ENV_HMPRB_NOI_MCQ_factored <- factor(subset_data$ENV_HMPRB_NOI_MCQ,#noise
+                                                      levels = c(0, 1),
+                                                      labels = c("No", "Yes"))
+
+
+
+label(subset_data$ENV_HMPRB_CON_MCQ_factored)     <- "Home Problems: Condensation"
+label(subset_data$ENV_HMPRB_NOI_MCQ_factored)     <- "Home Problems: Noise"
+label(subset_data$pm25_1yr_com)          <- "PM2.5 (1-year average)"
+label(subset_data$no2_1yr_com)          <- "NO2 (1-year average)"
+label(subset_data$so2_1yr_com)          <- "SO2 (1-year average)"
+label(subset_data$o3_1yr_com)           <- "Ozone (1-year average)"
+label(subset_data$GRLANYY_26_COM)       <- "Greenness (Maximum of annual mean NDVI within 250m)"
+label(subset_data$temp_1yr_com)         <- "Temperature (1-year average)"
+label(subset_data$LGTNLTYY_01_COM)      <- "Nighttime Light Brightness"
+label(subset_data$Locrds_length_200m_com)  <- "Length of local rds within 200m of postal code centre"
+label(subset_data$Phwy_length_200m_com) <- "Length of hwy within 200m of postal code centre" 
+
+table1(~ ENV_HMPRB_CON_MCQ_factored + ENV_HMPRB_NOI_MCQ_factored + pm25_1yr_com + no2_1yr_com + so2_1yr_com 
+       + o3_1yr_com +  GRLANYY_26_COM + temp_1yr_com + LGTNLTYY_01_COM + 
+         Locrds_length_200m_com + Phwy_length_200m_com, data = subset_data)
+
+
+
+label(subset_data$grtcc10_01_COM)  <- "Mean % of pixel covered by vegetation >5m"
+label(subset_data$grtcc10_02_COM)  <- "Mean % of pixel covered by vegetation >5m within 100m"
+label(subset_data$grtcc10_03_COM)  <- "Mean % of pixel covered by vegetation >5m within 250m"
+label(subset_data$grtcc10_04_COM)  <- "Mean % of pixel covered by vegetation >5m within 500m"
+label(subset_data$grtcc10_05_COM)  <- "Mean % of pixel covered by vegetation >5m within 1km"
+
+label(subset_data$GRUMPYY_01_COM)  <- "Annual % vegetative greenness at postal code"
+label(subset_data$GRUMPYY_02_COM)  <- "Mean of annual % of vegetative greenness within 100m"
+label(subset_data$GRUMPYY_03_COM)  <- "Mean of annual % of vegetative greenness within 250m" 
+label(subset_data$GRUMPYY_04_COM)  <- "Mean of annual % of vegetative greenness within 500m"
+label(subset_data$GRUMPYY_05_COM)  <- "Mean of annual % of vegetative greenness within 1km"
+label(subset_data$GRUMPYY_06_COM)  <- "Max of annual % of vegetative greenness within 100m" 
+label(subset_data$GRUMPYY_07_COM)  <- "Max of annual % of vegetative greenness within 250m" 
+label(subset_data$GRUMPYY_08_COM)  <- "Max of annual % of vegetative greenness within 500m" 
+label(subset_data$GRUMPYY_09_COM)  <- "Max of annual % of vegetative greenness within 1km" 
+
+
+
+table1(~ grtcc10_01_COM + grtcc10_02_COM + grtcc10_03_COM + grtcc10_04_COM + grtcc10_05_COM 
+       + GRUMPYY_01_COM +  GRUMPYY_02_COM + GRUMPYY_03_COM + GRUMPYY_04_COM + 
+         GRUMPYY_05_COM + GRUMPYY_06_COM + GRUMPYY_07_COM + GRUMPYY_08_COM + GRUMPYY_09_COM, data = subset_data)
+
+
+
+#Aging measures (outcomes)
+
+table1(~ GrimAge_EAA + PhenoAge_EAA + DunedinPACE + DNAmIC, data = subset_data)
+
+
+```
+
+
+
+
+## Covariates Smoking, Alcohol, PASE
+
+```{r}
+
+#PASE
+str(subset_data$PA2_DSCR2_MCQ) #PASE is numeric variable 
+
+#smoke
+str(subset_data$ICQ_SMOKE_COM) #smoke is integer (though it is categorical...)
+table(subset_data$ICQ_SMOKE_COM) #1=Yes (I currently smoke), 2=No (I don't smoke and I never have), 3=Former (I don't smoke now but I have in the past)
+subset_data$ICQ_SMOKE_COM_RECODED <- dplyr::case_when( #recode to 1=No I don't smoke and never have. 2=former. 3= yes i currently smoke 
+  subset_data$ICQ_SMOKE_COM == 2 ~ 1,
+  subset_data$ICQ_SMOKE_COM == 3 ~ 2,
+  subset_data$ICQ_SMOKE_COM == 1 ~ 3,
+  TRUE ~ NA_real_   
+)
+table(subset_data$ICQ_SMOKE_COM_RECODED)
+subset_data$ICQ_SMOKE_COM <- subset_data$ICQ_SMOKE_COM_RECODED
+sum(is.na(subset_data$ICQ_SMOKE_COM)) #number of NAs is 229
+
+
+#alcohol
+str(subset_data$ALC_FREQ_COM) #alcohol is integer (though it is categorical...)
+table(subset_data$ALC_FREQ_COM)  
+
+01			Almost every day (incl. 6 times a week)
+02			4-5 times a week
+03			2-3 times a week
+04			Once a week
+05			2-3 times a month
+06			About once a month
+07			Less than once a month
+96=never. 98=don't know/no answer 
+
+subset_data$ALC_FREQ_COM_RECODED <- dplyr::case_when( #recode to 1=Least drinking. 
+  subset_data$ALC_FREQ_COM == 7 ~ 1,
+  subset_data$ALC_FREQ_COM == 6 ~ 2,
+  subset_data$ALC_FREQ_COM == 5 ~ 3,
+  subset_data$ALC_FREQ_COM == 4 ~ 4,
+  subset_data$ALC_FREQ_COM == 3 ~ 5,
+  subset_data$ALC_FREQ_COM == 2 ~ 6,
+  subset_data$ALC_FREQ_COM == 1 ~ 7,
+  subset_data$ALC_FREQ_COM == 96 ~ 8,
+  subset_data$ALC_FREQ_COM == 98 ~ NA_real_,  
+  TRUE ~ NA_real_
+)
+table(subset_data$ALC_FREQ_COM_RECODED)
+subset_data$ALC_FREQ_COM <- subset_data$ALC_FREQ_COM_RECODED
+sum(is.na(subset_data$ALC_FREQ_COM)) #number of NAs is 257
+
+
+#make sure the variables are appropriate types 
+
+vars_to_check <- c(
+  "AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7",
+  
+  # Socioeconomic
+  "INC_TOT_COM", "ED_HIGH_COM", "WEA_SVNGSVL_MCQ",
+  
+  # Outcomes
+  "GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC",
+  
+  # Environmental exposures
+  "pm25_1yr_com", "no2_1yr_com", "o3_1yr_com", "GRLANYY_26_COM", "temp_1yr_com", 
+  "LGTNLTYY_01_COM", "ENV_HMPRB_CON_MCQ", "ENV_HMPRB_NOI_MCQ",   
+  
+  # Lifestyle / behavioral
+  "PA2_DSCR2_MCQ", "ALC_FREQ_COM", "ICQ_SMOKE_COM"
+)
+sapply(subset_data[vars_to_check], class)
+
+```
+
+
+# Delete 
+
+## Charts: age, sex, ethnicity, income, wealth  
+```{r}
+
+#sex and age 
+barplot(table(subset_data$SEX_ASK_COM),
+        main = "Sex Distribution",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.8)
+
+
+# age and sex  ------------------------------------------------------
+
+#pie chart for sex
+df_sex <- subset_data %>%
+  filter(!is.na(SEX_ASK_COM)) %>%
+  count(SEX_ASK_COM) %>%
+  mutate(
+    percent = n / sum(n),
+    label = paste0(SEX_ASK_COM, " (", round(percent * 100, 1), "%)")
+  )
+
+ggplot(df_sex, aes(x = 1, y = n, fill = SEX_ASK_COM)) +
+  geom_col(width = 1, color = "white", linewidth = 1) +
+  coord_polar(theta = "y") +
+  geom_text(
+    aes(label = label),
+    position = position_stack(vjust = 0.5),
+    size = 10,              # big, slide-friendly
+    fontface = "plain"
+  ) +
+  scale_fill_manual(values = c("F" = "#1f77b4", "M" = "#ff7f0e")) +
+  labs(title = "Sex Distribution", x = NULL, y = NULL, fill = NULL) +
+  theme_void() +
+  theme(
+    # remove any remaining axis/radial artifacts
+    axis.line = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face  = "bold",
+      size  = 38,
+      margin = margin(b = 18)
+    ),
+    
+    legend.position = "right",
+    legend.text = element_text(size = 26),
+    legend.key.size = grid::unit(1.2, "lines")
+  )
+
+
+
+#age boxplot 
+subset_data %>%
+  filter(!is.na(AGE_NMBR_COM)) %>%
+  ggplot(aes(x = "", y = AGE_NMBR_COM)) +
+  geom_boxplot(
+    width = 0.25,
+    fill = "white",
+    color = "#2C7FB8",
+    linewidth = 1.2
+  ) +
+  scale_y_continuous(
+    breaks = seq(
+      floor(min(subset_data$AGE_NMBR_COM, na.rm = TRUE) / 5) * 5,
+      ceiling(max(subset_data$AGE_NMBR_COM, na.rm = TRUE) / 5) * 5,
+      by = 5
+    )
+  ) +
+  labs(
+    title = "Age Distribution",
+    x = NULL,
+    y = "Age (years)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust  = 0.5,
+      face   = "bold",
+      size   = 38,
+      margin = margin(b = 18)
+    ),
+    axis.title.y = element_text(
+      face   = "bold",
+      size   = 30,
+      margin = margin(r = 16)
+    ),
+    axis.title.x = element_blank(),
+    axis.text.y  = element_text(size = 26),
+    axis.text.x  = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_line(linetype = "dotted"),
+    panel.grid.major.y = element_line(linetype = "dashed"),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA)
+  )
+
+
+
+# ethnicity, income, wealth ---------------------------------------------------
+#cultural background
+#horizontal bar plots
+
+subset_data %>%
+  filter(!is.na(Race7)) %>%
+  count(Race7, name = "n") %>%
+  arrange(n) %>%
+  ggplot(aes(x = n, y = Race7)) +
+  geom_col(fill = "#2C7FB8", width = 0.7) +
+  labs(
+    title = "Self-Reported Cultural Background",
+    x = "Number of participants",
+    y = NULL
+  ) +
+  theme_classic(base_size = 26) +   # ⬅️ bigger global base
+  theme(
+    legend.position = "none",
+    
+    # TITLE — BIG
+    plot.title = element_text(
+      hjust = 0.5,
+      face  = "bold",
+      size  = 38,          # ⬅️ increased
+      margin = margin(b = 18)
+    ),
+    
+    # AXIS TITLES — BIGGER
+    axis.title.x = element_text(
+      face = "bold",
+      size = 30,          # ⬅️ increased
+      margin = margin(t = 16)
+    ),
+    axis.title.y = element_blank(),
+    
+    # AXIS TICK LABELS — BIGGER
+    axis.text.x = element_text(size = 26),   # ⬅️ increased
+    axis.text.y = element_text(size = 26)
+  )
+
+
+
+
+#horizontal bar chart of household income categories 
+library(tidyverse)
+
+subset_data %>%
+  mutate(
+    income_cat = factor(
+      INC_TOT_COM,  # personal/household income
+      levels = c(1, 2, 3, 4, 5, 7, 8, 9),
+      labels = c(
+        "<20K",
+        "20K–50K",
+        "50K–100K",
+        "100K–150K",
+        "150K+",
+        "Missing",
+        "Don't know/No answer",
+        "Refused"
+      )
+    )
+  ) %>%
+  count(income_cat, name = "n") %>%
+  arrange(n) %>%
+  ggplot(aes(x = n, y = income_cat)) +
+  geom_col(fill = "#2C7FB8", width = 0.7) +
+  labs(
+    title = "Household Income (Past 12 Months)",
+    x = "Number of participants",
+    y = NULL
+  ) +
+  theme_classic(base_size = 26) +
+  theme(
+    legend.position = "none",
+    
+    # TITLE
+    plot.title = element_text(
+      hjust = 0.5,
+      face  = "bold",
+      size  = 38,
+      margin = margin(b = 18)
+    ),
+    
+    # AXIS TITLES
+    axis.title.x = element_text(
+      face = "bold",
+      size = 30,
+      margin = margin(t = 16)
+    ),
+    axis.title.y = element_blank(),
+    
+    # AXIS TICK LABELS
+    axis.text.x = element_text(size = 26),
+    axis.text.y = element_text(size = 26)
+  )
+
+
+
+
+#horizontal bar chart of wealth/savings   
+subset_data %>%
+  mutate(
+    wealth_cat = factor(
+      WEA_SVNGSVL_MCQ,  
+      levels = c(1, 2, 3, 4, 8, 9),
+      labels = c(
+        "<50K",
+        "50K–100K",
+        "100K to <$1 million",
+        "$1 million +",
+        "Don't know/No answer",
+        "Refused"
+      )
+    )
+  ) %>%
+  count(wealth_cat, name = "n") %>%
+  arrange(n) %>%
+  ggplot(aes(x = n, y = wealth_cat)) +
+  geom_col(fill = "#2C7FB8", width = 0.7) +
+  labs(
+    title = "Total Savings and Investments",
+    x = "Number of participants",
+    y = NULL
+  ) +
+  theme_classic(base_size = 26) +
+  theme(
+    legend.position = "none",
+    plot.title = element_text(
+      hjust = 0.5, face = "bold", size = 38,
+      margin = margin(b = 18)
+    ),
+    axis.title.x = element_text(
+      face = "bold", size = 30,
+      margin = margin(t = 16)
+    ),
+    axis.title.y = element_blank(),
+    axis.text.x  = element_text(size = 26),
+    axis.text.y  = element_text(size = 26)
+  )
+
+```
