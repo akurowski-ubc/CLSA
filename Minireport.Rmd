@@ -17,73 +17,12 @@ knitr::opts_chunk$set(
 ```
 
 
-### 2.3.5 Tree canopy coverage and vegetative greenness fractions
-
-Tree canopy is defined as area of vegetation (including leaves, stems, branches, etc.) of woody plants above 5m in height. CANUE staff retrieved tree canopy cover data from Google Earth Engine (GEE) for the year 2010 and 2015, extracted values (percent coverage) to postal codes and calculated summary measures (average percent coverage) within buffers of 100, 250, 500, and 1000 metres.https://www.canuedata.ca/metadata.php
 
 
+## 3.2 Condensation problems by Income Group 
 
+54 participants had homes with condensation problems, while 1348 participants did not. The following figure shows the income distribution of participants who had condensation problems. 
 
-
-
-```{r table_airquality, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
-knitr::include_graphics("Tables/Table_airquality.png")
+```{r figure_condensation, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Number of homes with condensation by household income group"}
+knitr::include_graphics("Figures/barplot_condensation.png")
 ```
-
-
-### 2.3.2 Greenness (NDVI)
-
-Maximum of annual mean Normalized Difference Vegetation Index (NDVI) within 250m. Range is -1 to + 1.
-
-
-```{r figure_ndvi, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
-knitr::include_graphics("Tables/Table_ndvi.png")
-```
-
-
-
-### 2.3.3 Condensation and noise 
-
-"Home problems: Condensation" measures if current home has problems with condensation (Yes or No). 
-"Home problems: Noise measures" if current home has problems with noise (Yes or No). 
-
-```{r table_housing, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
-knitr::include_graphics("Tables/Table_housing.png")
-```
-
-
-
-### 2.3.4 Length of roads within certain distances 
-
-length of local/major roads within 200 m of 6 digit postal code center (2013)
-length of primary highway/expressway within 200 m of 6 digit postal code center (2013)
-
-```{r table_roads, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
-knitr::include_graphics("Tables/Table_roads.png")
-```
-
-
-
-### 2.3.5 Tree canopy coverage and vegetative greenness fractions
-
-Tree canopy is defined as area of vegetation (including leaves, stems, branches, etc.) of woody plants above 5m in height. CANUE staff retrieved tree canopy cover data from Google Earth Engine (GEE) for the year 2010 and 2015, extracted values (percent coverage) to postal codes and calculated summary measures (average percent coverage) within buffers of 100, 250, 500, and 1000 metres.https://www.canuedata.ca/metadata.php
-
-```{r table_treecanopy, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
-knitr::include_graphics("Tables/Table_treecanopy.png")
-```
-
-
-
-Vegetative greenness fractions: Users can interpret values as the percentage of green vegetation within each 30 m by 30 m pixel, but vegetative greenness fraction values are an indication of both the area coverage and intensity (i.e., strength of spectral signal) of all green vegetation within a 30 m by 30 m pixel. For instance, built environment factors (e.g. housing, asphalt) as well as tree canopy are accounted for in analysis, and therefore the presence of roads and buildings underneath canopy can yield lower greenness values. Water pixels were masked out using the Statistics Canada 2016 census water boundary files. CANUE staff assigned values to postal codes (1984-2016) as annual metrics and by calculating the mean and maximum of pixel level greenness within buffers of 100, 250, 500, and 1000 m. https://www.canuedata.ca/metadata.php
-
-```{r table_percentveggreenness, echo=FALSE, fig.width=8, fig.height=5, out.width="100%"}
-knitr::include_graphics("Tables/Table_percentveg.png")
-```
-
-
-
-
-
-
-
-

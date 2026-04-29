@@ -29,10 +29,20 @@ grep("GRUMPY", names(CLSA_methylation), ignore.case = TRUE, value = TRUE) #check
 library(dplyr)
 library(ggplot2)
 library(tidyverse)
+library(flextable)
 library (haven)
 library(table1)
 library(stargazer)
 library(htmltools)
+
+library(table1)
+library(Hmisc)
+library(htmltools)
+library(webshot2)
+library(tidyverse)
+library(ggplot2)
+
+
 
 
 #create a subset 
@@ -183,6 +193,55 @@ saveRDS(subset_data, file = "subset_data.rds")
 ```
 
 
+General Code needed for plots 
+
+```{r}
+#Custom theme for all figures
+
+report_theme <- theme_classic(base_size = 11) +
+  theme(
+    legend.position = "none",
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face  = "bold",
+      size  = 13,
+      margin = margin(b = 8)
+    ),
+    
+    axis.title.x = element_text(
+      face = "bold",
+      size = 11,
+      margin = margin(t = 6)
+    ),
+    axis.title.y = element_text(
+      face = "bold",
+      size = 11,
+      margin = margin(r = 6)
+    ),
+    
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10)
+  )
+
+# Shared income labels
+income_labels <- c(
+  "<20K",
+  "20K–50K",
+  "50K–100K",
+  "100K–150K",
+  "150K+"
+)
+```
+
+
+
+
+
+
+
+
+
 ## 1.3 Reference info about variable names (new enviro variables) 
 
 
@@ -203,7 +262,6 @@ grtcc10_05_COM: Average of estimated percent of pixel covered by vegetation grea
 ```{r}
 
 subset_data <- readRDS("subset_data.rds")
-library(ggplot2)
 
 # age and sex  ------------------------------------------------------
 
@@ -307,34 +365,6 @@ subset_data %>%
 ```
 
 ```{r}
-#Custom theme for all figures
-
-report_theme <- theme_classic(base_size = 11) +
-  theme(
-    legend.position = "none",
-    
-    plot.title = element_text(
-      hjust = 0.5,
-      face  = "bold",
-      size  = 13,
-      margin = margin(b = 8)
-    ),
-    
-    axis.title.x = element_text(
-      face = "bold",
-      size = 11,
-      margin = margin(t = 6)
-    ),
-    axis.title.y = element_text(
-      face = "bold",
-      size = 11,
-      margin = margin(r = 6)
-    ),
-    
-    axis.text.x = element_text(size = 10),
-    axis.text.y = element_text(size = 10)
-  )
-
 
 # ethnicity/self reported background barplot 
 p_ethnicity <- subset_data %>%
@@ -381,23 +411,18 @@ subset_data %>%
 ```{r}
 
 # household income barplot 
-p_income <- subset_data %>%
+subset_data <- subset_data %>%# Add income_cat to subset_data 
   mutate(
     income_cat = factor(
       INC_TOT_COM,
       levels = c(1, 2, 3, 4, 5, 7, 8, 9),
-      labels = c(
-        "<20K",
-        "20K–50K",
-        "50K–100K",
-        "100K–150K",
-        "150K+",
-        "Missing",
-        "Don't know/No answer",
-        "Refused"
-      )
+      labels = c("<20K", "20K–50K", "50K–100K", "100K–150K",
+                 "150K+", "Missing", "Don't know/No answer", "Refused")
     )
-  ) %>%
+  )
+
+# Household income barplot
+p_income <- subset_data %>%
   count(income_cat, name = "n") %>%
   arrange(n) %>%
   ggplot(aes(x = n, y = income_cat)) +
@@ -410,6 +435,11 @@ p_income <- subset_data %>%
   report_theme
 
 ggsave("Figures/household_income_barplot.png", plot = p_income, width = 5, height = 4, dpi = 300)
+
+
+
+
+
 
 
 # savings/wealth barplot 
@@ -448,7 +478,7 @@ ggsave("Figures/savings_barplot.png", plot = p_wealth, width = 5, height = 4, dp
 
 # 3.0 Environmental Variables 
 
-##3.1 Pollution variables 
+## 3.1 Pollution variables 
 
 
 ```{r}
@@ -469,10 +499,352 @@ ft <- flextable(summary_table) %>%
 save_as_image(ft, path = "Tables/Table_airquality.png", res = 300)
 ```
 
+```{r}
+#air pollution dashboard 
+air_vars <- list(
+  list(col = "pm25_1yr_com",  title = "PM2.5 (µg/m³)", file = "pm25",  binwidth = 0.5, limits = c(3, 11),  breaks = seq(3, 11, by = 1)),
+  list(col = "no2_1yr_com",   title = "NO2 (ppb)",      file = "no2",   binwidth = 1,   limits = c(3, 16),  breaks = seq(3, 16, by = 2)),
+  list(col = "so2_1yr_com",   title = "SO2 (ppb)",      file = "so2",   binwidth = 0.1, limits = c(0, 3.2), breaks = seq(0, 3.2, by = 0.5)),
+  list(col = "o3_1yr_com",    title = "Ozone (ppb)",    file = "ozone", binwidth = 1,   limits = c(15, 33), breaks = seq(15, 33, by = 2))
+)
+
+air_plots <- list()
+
+for (v in air_vars) {
+  p <- ggplot(subset_data, aes(x = .data[[v$col]])) +
+    geom_histogram(binwidth = v$binwidth, fill = "steelblue", color = "white") +
+    scale_x_continuous(breaks = v$breaks, limits = v$limits) +
+    labs(title = v$title, x = v$title, y = "Count") +
+    report_theme +
+    theme(plot.title = element_text(size = 9))
+  
+  air_plots[[v$col]] <- p
+  ggsave(paste0("Figures/", v$file, "_histogram.png"), plot = p, width = 5, height = 4, dpi = 300)
+}
+
+dashboard_air <- wrap_plots(air_plots, ncol = 2) +
+  plot_annotation(
+    title = "Air Pollution Distributions",
+    theme = theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+  )
+
+ggsave("Figures/air_pollution_dashboard.png", plot = dashboard_air, width = 10, height = 8, dpi = 300)
+
+```
 
 
 
-## 3.2 Greenness and condensation/noise
+
+
+
+
+
+
+
+
+
+
+## 3.2 Condensation/noise
+
+```{r}
+## 3.3 Condensation and noise 
+vars_housing <- list(
+  list(col = "ENV_HMPRB_CON_MCQ", label = "Condensation"),
+  list(col = "ENV_HMPRB_NOI_MCQ", label = "Noise")
+)
+
+summary_table_housing <- lapply(vars_housing, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable  = v$label,
+    `Yes n (%)` = paste0(sum(x == 1, na.rm=TRUE), " (", round(mean(x == 1, na.rm=TRUE)*100, 1), "%)"),
+    `No n (%)`  = paste0(sum(x == 0, na.rm=TRUE), " (", round(mean(x == 0, na.rm=TRUE)*100, 1), "%)"),
+    `Missing`   = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_housing <- flextable(summary_table_housing) %>%
+  add_header_lines("Table X. Problems with Housing") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Yes n (%)", "No n (%)", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_housing, path = "Tables/Table_housing.png", res = 300)
+```
+
+
+```{r}
+
+#Problems with condensation
+condensation_bar <- ggplot(subset_data, aes(x = factor(ENV_HMPRB_CON_MCQ))) +
+  geom_bar(fill = "steelblue", color = "white") +
+  geom_text(
+    aes(label = paste0(round(after_stat(count/sum(count)*100), 1), "%")),
+    stat = "count",
+    vjust = -0.5,
+    size = 4
+  ) +
+  scale_x_discrete(labels = c("0" = "No", "1" = "Yes")) +
+  labs(
+    title = "Problems with Condensation in Home",
+    x = "Condensation",
+    y = "Count"
+  ) +
+  report_theme +
+  theme(plot.margin = margin(t = 20, r = 10, b = 10, l = 10)) +
+  coord_cartesian(clip = "off")
+
+ggsave("Figures/condensation_bar.png", plot = condensation_bar, width = 5, height = 4, dpi = 300)
+
+
+
+
+#Problems with noise
+
+noise_bar <- ggplot(subset_data, aes(x = factor(ENV_HMPRB_NOI_MCQ))) +
+  geom_bar(fill = "steelblue", color = "white") +
+  geom_text(
+    aes(label = paste0(round(after_stat(count/sum(count)*100), 1), "%")),
+    stat = "count",
+    vjust = -0.5,
+    size = 4
+  ) +
+  scale_x_discrete(labels = c("0" = "No", "1" = "Yes")) +
+  labs(
+    title = "Problems with Noise",
+    x = "Noise",
+    y = "Count"
+  ) +
+  report_theme +
+  theme(plot.margin = margin(t = 20, r = 10, b = 10, l = 10)) +
+  coord_cartesian(clip = "off")
+
+ggsave("Figures/noise_bar.png", plot = noise_bar, width = 5, height = 4, dpi = 300)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+## 3.3 Tree Canopy Coverage (TCC) and % vegetation 
+```{r}
+# Table 1 - Tree Canopy Coverage
+vars_canopy <- list(
+  list(col = "grtcc10_01_COM", label = "Mean % of pixel covered by vegetation >5m"),
+  list(col = "grtcc10_02_COM", label = "Mean % of pixel covered by vegetation >5m, within 100m"),
+  list(col = "grtcc10_03_COM", label = "Mean % of pixel covered by vegetation >5m, within 250m"),
+  list(col = "grtcc10_04_COM", label = "Mean % of pixel covered by vegetation >5m, within 500m"),
+  list(col = "grtcc10_05_COM", label = "Mean % of pixel covered by vegetation >5m, within 1km")
+)
+
+summary_table_canopy <- lapply(vars_canopy, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable            = v$label,
+    `Mean (SD)`         = paste0(round(mean(x, na.rm=TRUE), 2), " (", round(sd(x, na.rm=TRUE), 2), ")"),
+    `Median [Min, Max]` = paste0(round(median(x, na.rm=TRUE), 2), " [", round(min(x, na.rm=TRUE), 2), ", ", round(max(x, na.rm=TRUE), 2), "]"),
+    `Missing`           = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_canopy <- flextable(summary_table_canopy) %>%
+  add_header_lines("Table X. Tree Canopy Coverage") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  flextable::bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_canopy, path = "Tables/Table_treecanopy.png", res = 300)
+
+```
+
+
+
+```{r}
+# Tree canopy histogram dashboard 
+canopy_vars <- list(
+  list(col = "grtcc10_01_COM", title = "Estimated % Pixel Covered by Vegetation >5m",           file = "canopy_01"),
+  list(col = "grtcc10_02_COM", title = "Mean % Pixel Covered by Vegetation >5m within 100m",    file = "canopy_02"),
+  list(col = "grtcc10_03_COM", title = "Mean % Pixel Covered by Vegetation >5m within 250m",    file = "canopy_03"),
+  list(col = "grtcc10_04_COM", title = "Mean % Pixel Covered by Vegetation >5m within 500m",    file = "canopy_04"),
+  list(col = "grtcc10_05_COM", title = "Mean % Pixel Covered by Vegetation >5m within 1km",     file = "canopy_05")
+)
+
+for (v in canopy_vars) {# Save individual histograms
+  p <- ggplot(subset_data, aes(x = .data[[v$col]])) +
+    geom_histogram(binwidth = 5, fill = "forestgreen", color = "white") +
+    scale_x_continuous(breaks = c(0, 10, 20, 30, 40, 50, 60, 70, 80)) +
+    labs(title = v$title, x = "Tree Canopy Cover (%)", y = "Count") +
+    report_theme
+  ggsave(paste0("Figures/", v$file, "_histogram.png"), plot = p, width = 5, height = 4, dpi = 300)
+}
+
+canopy_plots <- list()# Dashboard
+
+for (v in canopy_vars) {
+  p <- ggplot(subset_data, aes(x = .data[[v$col]])) +
+    geom_histogram(binwidth = 5, fill = "forestgreen", color = "white") +
+    scale_x_continuous(breaks = c(0, 20, 40, 60, 80)) +
+    labs(title = v$title, x = "Tree Canopy Cover (%)", y = "Count") +
+    report_theme +
+    theme(plot.title = element_text(size = 8))
+  
+  canopy_plots[[v$col]] <- p
+}
+
+dashboard_canopy <- wrap_plots(canopy_plots, ncol = 3) +# 5 plots — arrange in 2 rows (3 top, 2 bottom)
+  plot_annotation(
+    title = "Tree Canopy Coverage Distributions",
+    theme = theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+  )
+
+ggsave("Figures/tree_canopy_dashboard.png", plot = dashboard_canopy, width = 15, height = 9, dpi = 300)
+
+
+```
+
+
+
+
+## 3.4  % vegetation 
+
+```{r}
+# Table 2 - Vegetative Greenness
+vars_greenness <- list(
+  list(col = "GRUMPYY_01_COM", label = "Mean of annual % vegetative greenness, At postal code"),
+  list(col = "GRUMPYY_02_COM", label = "Mean of annual % vegetative greenness, within 100m"),
+  list(col = "GRUMPYY_03_COM", label = "Mean of annual % vegetative greenness, within 250m"),
+  list(col = "GRUMPYY_04_COM", label = "Mean of annual % vegetative greenness, within 500m"),
+  list(col = "GRUMPYY_05_COM", label = "Mean of annual % vegetative greenness, within 1km"),
+  list(col = "GRUMPYY_06_COM", label = "Max of annual % vegetative greenness, within 100m"),
+  list(col = "GRUMPYY_07_COM", label = "Max of annual % vegetative greenness, within 250m"),
+  list(col = "GRUMPYY_08_COM", label = "Max of annual % vegetative greenness, within 500m"),
+  list(col = "GRUMPYY_09_COM", label = "Max of annual % vegetative greenness, within 1km")
+)
+
+summary_table_greenness <- lapply(vars_greenness, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable            = v$label,
+    `Mean (SD)`         = paste0(round(mean(x, na.rm=TRUE), 2), " (", round(sd(x, na.rm=TRUE), 2), ")"),
+    `Median [Min, Max]` = paste0(round(median(x, na.rm=TRUE), 2), " [", round(min(x, na.rm=TRUE), 2), ", ", round(max(x, na.rm=TRUE), 2), "]"),
+    `Missing`           = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_greenness <- flextable(summary_table_greenness) %>%
+  add_header_lines("Table X. Percent Vegetative Greenness") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_greenness, path = "Tables/Table_percentveg.png", res = 300)
+```
+
+```{r}
+
+#Percent veg greenness histograms (9 of them)
+
+greenness_vars <- list(
+  list(col = "GRUMPYY_01_COM", title = "Annual % Vegetative Greenness at Postal Code",        file = "greenness_01"),
+  list(col = "GRUMPYY_02_COM", title = "Mean Annual % Vegetative Greenness within 100m",       file = "greenness_02"),
+  list(col = "GRUMPYY_03_COM", title = "Mean Annual % Vegetative Greenness within 250m",       file = "greenness_03"),
+  list(col = "GRUMPYY_04_COM", title = "Mean Annual % Vegetative Greenness within 500m",       file = "greenness_04"),
+  list(col = "GRUMPYY_05_COM", title = "Mean Annual % Vegetative Greenness within 1000m",      file = "greenness_05"),
+  list(col = "GRUMPYY_06_COM", title = "Max Annual % Vegetative Greenness within 100m",        file = "greenness_06"),
+  list(col = "GRUMPYY_07_COM", title = "Max Annual % Vegetative Greenness within 250m",        file = "greenness_07"),
+  list(col = "GRUMPYY_08_COM", title = "Max Annual % Vegetative Greenness within 500m",        file = "greenness_08"),
+  list(col = "GRUMPYY_09_COM", title = "Max Annual % Vegetative Greenness within 1000m",       file = "greenness_09")
+)
+
+for (v in greenness_vars) {
+  p <- ggplot(subset_data, aes(x = .data[[v$col]])) +
+    geom_histogram(binwidth = 5, fill = "forestgreen", color = "white") +
+    scale_x_continuous(breaks = c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90)) +
+    labs(title = v$title, x = "Vegetative Greenness (%)", y = "Count") +
+    report_theme
+  ggsave(paste0("Figures/", v$file, "_histogram.png"), plot = p, width = 5, height = 4, dpi = 300)
+}
+
+library(patchwork)
+
+# Use your loop to store plots in a list instead of saving individually
+greenness_plots <- list()
+
+for (v in greenness_vars) {
+  p <- ggplot(subset_data, aes(x = .data[[v$col]])) +
+    geom_histogram(binwidth = 5, fill = "forestgreen", color = "white") +
+    scale_x_continuous(breaks = c(0, 20, 40, 60, 80, 100)) +
+    labs(title = v$title, x = "Greenness (%)", y = "Count") +
+    report_theme +
+    theme(plot.title = element_text(size = 8))  # smaller title to fit
+  
+  greenness_plots[[v$col]] <- p
+}
+
+# Arrange in a 3x3 grid
+dashboard <- wrap_plots(greenness_plots, ncol = 3) +
+  plot_annotation(
+    title = "Vegetative Greenness Distributions",
+    theme = theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+  )
+
+ggsave("Figures/greenness_dashboard.png", plot = dashboard, width = 15, height = 12, dpi = 300)
+
+
+
+
+ndvi_500m <- ggplot(subset_data, aes(x = GRLANYY_26_COM)) +
+  geom_histogram(binwidth = 5, fill = "forestgreen", color = "white") +
+  scale_x_continuous(breaks = c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)) +
+  labs(
+    title = "Maximum Annual NDVI within 500m",
+    x = "NDVI (%)",
+    y = "Count"
+  ) +
+  report_theme
+
+ggsave("Figures/ndvi_500m_histogram.png", plot = ndvi_500m, width = 5, height = 4, dpi = 300)
+GRLANYY_26_COM
+```
+
+
+
+## 3.5  NDVI 
+
 
 ```{r}
 vars_ndvi <- list(
@@ -507,44 +879,28 @@ save_as_image(ft_ndvi, path = "Tables/Table_ndvi.png", res = 300)
 ```
 
 
-
-## 3.3 Condensation and noise 
-
 ```{r}
-vars_housing <- list(
-  list(col = "ENV_HMPRB_CON_MCQ", label = "Condensation"),
-  list(col = "ENV_HMPRB_NOI_MCQ", label = "Noise")
-)
+ndvi_500m <- ggplot(subset_data, aes(x = GRLANYY_26_COM)) +
+  geom_histogram(binwidth = 0.02, fill = "forestgreen", color = "white") +
+  scale_x_continuous(
+    breaks = seq(0.60, 1.00, by = 0.05),
+    limits = c(0.60, 1.00)
+  ) +
+  labs(
+    title = "Maximum Annual NDVI within 500m",
+    x = "NDVI",
+    y = "Count"
+  ) +
+  report_theme
 
-summary_table_housing <- lapply(vars_housing, function(v) {
-  x <- subset_data[[v$col]]
-  tibble(
-    Variable  = v$label,
-    `Yes n (%)` = paste0(sum(x == 1, na.rm=TRUE), " (", round(mean(x == 1, na.rm=TRUE)*100, 1), "%)"),
-    `No n (%)`  = paste0(sum(x == 0, na.rm=TRUE), " (", round(mean(x == 0, na.rm=TRUE)*100, 1), "%)"),
-    `Missing`   = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
-  )
-}) %>% bind_rows()
+ggsave("Figures/ndvi_500m_histogram.png", plot = ndvi_500m, width = 5, height = 4, dpi = 300)
 
-ft_housing <- flextable(summary_table_housing) %>%
-  add_header_lines("Table X. Problems with Housing") %>%
-  bold(part = "header") %>%
-  bold(j = "Variable") %>%
-  autofit() %>%
-  theme_booktabs() %>%
-  fontsize(size = 10, part = "all") %>%
-  fontsize(i = 1, size = 11, part = "header") %>%
-  bold(i = 1, part = "header") %>%
-  font(fontname = "Times New Roman", part = "all") %>%
-  align(i = 1, align = "center", part = "header") %>%
-  align(align = "left", part = "all") %>%
-  align(j = c("Yes n (%)", "No n (%)", "Missing"), align = "center", part = "body")
-
-save_as_image(ft_housing, path = "Tables/Table_housing.png", res = 300)
 ```
 
 
-## 3.4 Length of roads within 200m 
+
+
+## 3.6 Length of roads within 200m 
 
 ```{r}
 vars_roads <- list(
@@ -609,181 +965,6 @@ hist(subset_data$Locrds_length_200m_com,
 ```
 
 
-## 3.5 Canopy coverage and % vegetation 
-```{r}
-# Table 1 - Tree Canopy Coverage
-vars_canopy <- list(
-  list(col = "grtcc10_01_COM", label = "Mean % of pixel covered by vegetation >5m"),
-  list(col = "grtcc10_02_COM", label = "Mean % of pixel covered by vegetation >5m, within 100m"),
-  list(col = "grtcc10_03_COM", label = "Mean % of pixel covered by vegetation >5m, within 250m"),
-  list(col = "grtcc10_04_COM", label = "Mean % of pixel covered by vegetation >5m, within 500m"),
-  list(col = "grtcc10_05_COM", label = "Mean % of pixel covered by vegetation >5m, within 1km")
-)
-
-summary_table_canopy <- lapply(vars_canopy, function(v) {
-  x <- subset_data[[v$col]]
-  tibble(
-    Variable            = v$label,
-    `Mean (SD)`         = paste0(round(mean(x, na.rm=TRUE), 2), " (", round(sd(x, na.rm=TRUE), 2), ")"),
-    `Median [Min, Max]` = paste0(round(median(x, na.rm=TRUE), 2), " [", round(min(x, na.rm=TRUE), 2), ", ", round(max(x, na.rm=TRUE), 2), "]"),
-    `Missing`           = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
-  )
-}) %>% bind_rows()
-
-ft_canopy <- flextable(summary_table_canopy) %>%
-  add_header_lines("Table X. Tree Canopy Coverage") %>%
-  bold(part = "header") %>%
-  bold(j = "Variable") %>%
-  autofit() %>%
-  theme_booktabs() %>%
-  fontsize(size = 10, part = "all") %>%
-  fontsize(i = 1, size = 11, part = "header") %>%
-  bold(i = 1, part = "header") %>%
-  font(fontname = "Times New Roman", part = "all") %>%
-  align(i = 1, align = "center", part = "header") %>%
-  align(align = "left", part = "all") %>%
-  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
-
-save_as_image(ft_canopy, path = "Tables/Table_treecanopy.png", res = 300)
-
-# Table 2 - Vegetative Greenness
-vars_greenness <- list(
-  list(col = "GRUMPYY_01_COM", label = "Mean of annual % vegetative greenness, At postal code"),
-  list(col = "GRUMPYY_02_COM", label = "Mean of annual % vegetative greenness, within 100m"),
-  list(col = "GRUMPYY_03_COM", label = "Mean of annual % vegetative greenness, within 250m"),
-  list(col = "GRUMPYY_04_COM", label = "Mean of annual % vegetative greenness, within 500m"),
-  list(col = "GRUMPYY_05_COM", label = "Mean of annual % vegetative greenness, within 1km"),
-  list(col = "GRUMPYY_06_COM", label = "Max of annual % vegetative greenness, within 100m"),
-  list(col = "GRUMPYY_07_COM", label = "Max of annual % vegetative greenness, within 250m"),
-  list(col = "GRUMPYY_08_COM", label = "Max of annual % vegetative greenness, within 500m"),
-  list(col = "GRUMPYY_09_COM", label = "Max of annual % vegetative greenness, within 1km")
-)
-
-summary_table_greenness <- lapply(vars_greenness, function(v) {
-  x <- subset_data[[v$col]]
-  tibble(
-    Variable            = v$label,
-    `Mean (SD)`         = paste0(round(mean(x, na.rm=TRUE), 2), " (", round(sd(x, na.rm=TRUE), 2), ")"),
-    `Median [Min, Max]` = paste0(round(median(x, na.rm=TRUE), 2), " [", round(min(x, na.rm=TRUE), 2), ", ", round(max(x, na.rm=TRUE), 2), "]"),
-    `Missing`           = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
-  )
-}) %>% bind_rows()
-
-ft_greenness <- flextable(summary_table_greenness) %>%
-  add_header_lines("Table X. Percent Vegetative Greenness") %>%
-  bold(part = "header") %>%
-  bold(j = "Variable") %>%
-  autofit() %>%
-  theme_booktabs() %>%
-  fontsize(size = 10, part = "all") %>%
-  fontsize(i = 1, size = 11, part = "header") %>%
-  bold(i = 1, part = "header") %>%
-  font(fontname = "Times New Roman", part = "all") %>%
-  align(i = 1, align = "center", part = "header") %>%
-  align(align = "left", part = "all") %>%
-  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
-
-save_as_image(ft_greenness, path = "Tables/Table_percentveg.png", res = 300)
-```
-
-
-
-```{r}
-
-library(table1)
-library(Hmisc)
-library(htmltools)
-library(webshot2)
-
-
-# percent of pixel covered 
-label(subset_data$grtcc10_01_COM)  <- "Mean % of pixel covered"
-label(subset_data$grtcc10_02_COM)  <- "Mean % of pixel covered, within 100m"
-label(subset_data$grtcc10_03_COM)  <- "Mean % of pixel covered, within 250m"
-label(subset_data$grtcc10_04_COM)  <- "Mean % of pixel covered, within 500m"
-label(subset_data$grtcc10_05_COM)  <- "Mean % of pixel covered, within 1km"
-
-
-table_canopycoverage <- table1(~ grtcc10_01_COM + grtcc10_02_COM + grtcc10_03_COM + grtcc10_04_COM + grtcc10_05_COM, data = subset_data,   
-                              caption = "<b>Table X. Percent of pixel covered by vegetation > 5 metres</b>"
-)
-
-
-# Save as HTML then screenshot at high resolution
-html_file <- "Figures/Table_canopycoverage.html"
-
-save_html(
-  tags$html(
-    tags$head(tags$style("
-      body { zoom: 1.5; font-size: 22px; }
-      table { width: 100% !important; font-size: 15px; }
-      td, th { padding: 10px 16px !important; }
-      .table1 { font-size: 20px !important; }
-      caption { font-size: 20px !important; font-weight: bold; }
-    ")),
-    tags$body(HTML(as.character(table_canopycoverage)))
-  ),
-  file = html_file
-)
-
-webshot(html_file,
-        file = "Figures/Table_canopycoverage.png",
-        vwidth = 1200,    # wide viewport
-        vheight = 800,
-        zoom = 2)   
-
-
-
-
-# % vegetative greenness 
-label(subset_data$GRUMPYY_01_COM)  <- "Annual % vegetative greenness at postal code"
-label(subset_data$GRUMPYY_02_COM)  <- "Mean of annual % of vegetative greenness within 100m"
-label(subset_data$GRUMPYY_03_COM)  <- "Mean of annual % of vegetative greenness within 250m" 
-label(subset_data$GRUMPYY_04_COM)  <- "Mean of annual % of vegetative greenness within 500m"
-label(subset_data$GRUMPYY_05_COM)  <- "Mean of annual % of vegetative greenness within 1km"
-label(subset_data$GRUMPYY_06_COM)  <- "Max of annual % of vegetative greenness within 100m" 
-label(subset_data$GRUMPYY_07_COM)  <- "Max of annual % of vegetative greenness within 250m" 
-label(subset_data$GRUMPYY_08_COM)  <- "Max of annual % of vegetative greenness within 500m" 
-label(subset_data$GRUMPYY_09_COM)  <- "Max of annual % of vegetative greenness within 1km" 
-
-
-table_pixelcoverage <- table1(~ GRUMPYY_01_COM +  GRUMPYY_02_COM + GRUMPYY_03_COM + GRUMPYY_04_COM + 
-         GRUMPYY_05_COM + GRUMPYY_06_COM + GRUMPYY_07_COM + GRUMPYY_08_COM + GRUMPYY_09_COM, data = subset_data, 
-                                       caption = "<b>Table X. Percent of green vegetation within pixel</b>"
-)
-
-
-
-# Save as HTML then screenshot at high resolution
-html_file <- "Figures/Table_pixelcoverage.html"
-
-save_html(
-  tags$html(
-    tags$head(tags$style("
-      body { zoom: 1.5; font-size: 22px; }
-      table { width: 100% !important; font-size: 20px; }
-      td, th { padding: 10px 16px !important; }
-      .table1 { font-size: 20px !important; }
-      caption { font-size: 24px !important; font-weight: bold; }
-    ")),
-    tags$body(HTML(as.character(table_pixelcoverage)))
-  ),
-  file = html_file
-)
-
-# Convert HTML → PNG
-webshot(html_file,
-        file = "Figures/Table_pixelcoverage.png",
-        vwidth = 1200,
-        vheight = 800,
-        zoom = 2)
-
-
-```
-
-
-
-
 
 
 # 4.0 Aging outcome variables: summary stats 
@@ -826,6 +1007,17 @@ ggplot(df, aes(x = income_cat, y = pm25_1yr_com)) +
   report_theme
 
 ggsave("Figures/boxplot_pm25.png", width = 5, height = 4, dpi = 300)
+
+
+
+df %>% #check that there is significance for PM2.5 
+  group_by(income_cat) %>%
+  summarise(
+    n = n(),
+    median_pm25 = median(pm25_1yr_com, na.rm = TRUE),
+    mean_pm25 = round(mean(pm25_1yr_com, na.rm = TRUE), 2)
+  )
+kruskal.test(pm25_1yr_com ~ income_cat, data = df)
 
 
 
@@ -884,10 +1076,110 @@ ggsave("Figures/boxplot_ndvi.png", width = 5, height = 4, dpi = 300)
 ```
 
 
+
+### 3.1.2 PM2.5 median dot plot, by income group 
+
+
+```{r}
+df_pm25_summary <- df %>%
+  group_by(income_cat) %>%
+  summarise(
+    n = n(),
+    median_pm25 = median(pm25_1yr_com, na.rm = TRUE)
+  )
+
+p_pm25_dot <- ggplot(df_pm25_summary, aes(x = income_cat, y = median_pm25)) +
+  geom_point(size = 4, color = "#2C7FB8", aes(shape = "Median")) +
+  geom_text(aes(label = paste0("n=", n)), vjust = 2, size = 3.5) +
+  scale_shape_manual(name = "", values = c("Median" = 16)) +
+  scale_y_continuous(limits = c(6.0, 6.8)) +
+  labs(title = "Median PM2.5 Exposure by Income Group",
+       subtitle = "Kruskal-Wallis p = 0.032",
+       x = "Household Income",
+       y = "Median PM2.5 (µg/m³)") +
+  report_theme
+
+ggsave("Figures/pm25_median_dot.png", plot = p_pm25_dot,
+       width = 6, height = 4, dpi = 300)
+```
+
+
+
+```{r}
+air_income_plots <- list()
+
+for (v in air_income_vars) {
+  p <- subset_data %>%
+    filter(income_cat %in% c("<20K", "20K–50K", "50K–100K", "100K–150K", "150K+")) %>%
+    ggplot(aes(x = income_cat, y = .data[[v$col]], fill = income_cat)) +
+    geom_boxplot(outlier.alpha = 0.3, width = 0.6) +
+    scale_fill_brewer(palette = "Blues") +
+    labs(
+      title = v$title,
+      x = "Household Income",
+      y = v$y_lab
+    ) +
+    report_theme +
+    theme(
+      plot.title = element_text(size = 13, face = "bold"),
+      axis.title = element_text(size = 11),
+      axis.text = element_text(size = 9),
+      legend.position = "none"
+    )
+  
+  air_income_plots[[v$col]] <- p
+}
+
+dashboard_air_income <- wrap_plots(air_income_plots, ncol = 2) &
+  theme(
+    plot.margin = margin(t = 15, r = 15, b = 15, l = 15),
+    plot.background = element_rect(color = "grey60", linewidth = 1, fill = "white"),
+    panel.background = element_rect(fill = "white")
+  )
+
+dashboard_air_income <- dashboard_air_income +
+  plot_annotation(
+    title = "Air Pollution by Household Income",
+    theme = theme(
+      plot.title    = element_text(hjust = 0.5, face = "bold", size = 22),
+      plot.subtitle = element_text(hjust = 0.5, size = 11, color = "grey40"),
+      plot.caption  = element_text(size = 9, color = "grey40"),
+      plot.margin   = margin(t = 20, r = 10, b = 10, l = 10),
+      plot.background = element_rect(fill = "grey90", color = NA)
+    )
+  )
+
+ggsave("Figures/air_pollution_income_dashboard.png", plot = dashboard_air_income, width = 16, height = 13, dpi = 300)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## 5.2 Condensation by income 
 
 ```{r}
 #condensation by income
+
+cond_only <- subset_data %>% #keep only those with condensation problems (54 people)
+  filter(ENV_HMPRB_CON_MCQ == 1)
+
+cond_counts <- cond_only %>%
+  filter(INC_TOT_COM %in% 1:5) %>%
+  mutate(income_cat = factor(INC_TOT_COM, levels = 1:5, labels = income_labels)) %>%
+  count(income_cat, name = "n") %>%
+  mutate(pct = n / sum(n))
+
+cond_counts
 
 ggplot(cond_counts, aes(x = income_cat, y = n)) +
   geom_col(fill = "#2C7FB8", width = 0.6) +
@@ -906,7 +1198,25 @@ ggplot(cond_counts, aes(x = income_cat, y = n)) +
 
 ggsave("Figures/barplot_condensation.png", width = 5, height = 4, dpi = 300)
 
+
+
+
+
+ggplot(df, aes(x = income_cat, y = pm25_1yr_com)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "PM2.5 1 y average, by Income Group",
+    x = "Household Income",
+    y = "PM2.5 (µg/m³)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_pm25.png", width = 5, height = 4, dpi = 300)
+
 ```
+
+
+
 
 
 
@@ -1009,9 +1319,94 @@ ggplot(df, aes(x = income_cat, y = grtcc10_01_COM)) +
 
 
 ## 5.4 Vegetative greenness fractions by income 
+There is no pattern by income group. The values are all clustered between 26–31%.
+The GRUMPY variable measures all green vegetation including grass, shrubs, parks — not just tree canopy in residential areas.
+
+
+```{r}
+
+library(flextable)
+
+df_green_summary <- df %>%
+  group_by(income_cat) %>%
+  summarise(
+    n = n(),
+    median_green = median(GRUMPYY_01_COM, na.rm = TRUE),
+    mean_green = round(mean(GRUMPYY_01_COM, na.rm = TRUE), 1)
+  ) %>%
+  rename(
+    `Income Group` = income_cat,
+    `N` = n,
+    `Median Greenness (%)` = median_green,
+    `Mean Greenness (%)` = mean_green
+  )
+
+ft_green <- flextable(df_green_summary) %>%
+  flextable::add_header_lines("Table X. Vegetation Greenness (GRUMPY) by Income Group") %>%
+  flextable::bold(part = "header") %>%
+  flextable::bold(j = "Income Group") %>%
+  flextable::autofit() %>%
+  flextable::theme_booktabs() %>%
+  flextable::fontsize(size = 10, part = "all") %>%
+  flextable::fontsize(i = 1, size = 11, part = "header") %>%
+  flextable::bold(i = 1, part = "header") %>%
+  flextable::font(fontname = "Times New Roman", part = "all") %>%
+  flextable::align(i = 1, align = "center", part = "header") %>%
+  flextable::align(align = "left", part = "all") %>%
+  flextable::align(j = c("N", "Median Greenness (%)", "Mean Greenness (%)"), align = "center", part = "body")
+
+save_as_image(ft_green, path = "Tables/Table_veg_green_fraction_byincome.png", res = 300)
+
+```
+
+
 
 
 ## 5.5 Road length (nearby) by income 
+This was not a good variable to look at. 
+
+```{r}
+#median hwy length within 200 m, by income group, just the participants living near a hwy 
+
+p_hwy_dot <- ggplot(df_hwy_summary, aes(x = income_cat, y = median_length)) +
+  geom_point(size = 4, color = "#2C7FB8", aes(shape = "Median")) +
+  geom_text(aes(label = paste0("n=", n)), vjust = 2, size = 3.5) +
+  scale_shape_manual(name = "", values = c("Median" = 16)) +
+  scale_y_continuous(limits = c(40, 105)) +
+  labs(title = "Median Highway Length within 200m by Income Group",
+       subtitle = "Among participants living near a highway only",
+       x = "Household Income",
+       y = "Median Highway Length (m)") +
+  report_theme
+ggsave("Figures/highway_median_dot.png", plot = p_hwy_dot, 
+       width = 6, height = 4, dpi = 300)
+
+
+#median road length within 200 m, by income group, just the participants living near a road 
+
+df_local <- df %>% filter(Locrds_length_200m_com > 0)
+
+df_local_summary <- df_local %>%
+  group_by(income_cat) %>%
+  summarise(
+    n = n(),
+    median_length = median(Locrds_length_200m_com, na.rm = TRUE)
+  )
+
+p_local_dot <- ggplot(df_local_summary, aes(x = income_cat, y = median_length)) +
+  geom_point(size = 4, color = "#2C7FB8", aes(shape = "Median")) +
+  geom_text(aes(label = paste0("n=", n)), vjust = 2, size = 3.5) +
+  scale_shape_manual(name = "", values = c("Median" = 16)) +
+  labs(title = "Median Local Road Length within 200m by Income Group",
+       subtitle = "Among participants living near a local road only",
+       x = "Household Income",
+       y = "Median Local Road Length (m)") +
+  report_theme
+
+ggsave("Figures/localroad_median_dot.png", plot = p_local_dot,
+       width = 6, height = 4, dpi = 300)
+
+```
 
 
 
@@ -1043,11 +1438,7 @@ ggplot(df, aes(x = income_cat, y = grtcc10_01_COM)) +
 
 
 
-
-
-
-# Sample regressions for presentation? 
-
+# 6.0 Sample regressions for presentation? 
 
 ```{r}
 #factor variables 
@@ -1085,6 +1476,85 @@ results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
 write.csv(results, "Results9.csv", row.names = FALSE)
 
 ```
+
+
+
+# 7 To do 
+-median dot plots for NO2, SO2, Ozone 
+-visualizations of tree canopy and veg. 
+
+
+# 8 plots for presentation 
+
+
+```{r}
+air_income_plots_pres <- list()
+
+for (v in air_income_vars) {
+  p <- subset_data %>%
+    filter(income_cat %in% c("<20K", "20K–50K", "50K–100K", "100K–150K", "150K+")) %>%
+    ggplot(aes(x = income_cat, y = .data[[v$col]], fill = income_cat)) +
+    geom_boxplot(outlier.alpha = 0.3, width = 0.6) +
+    scale_fill_brewer(palette = "Blues") +
+    labs(
+      title = v$title,
+      x = "Household Income",
+      y = v$y_lab
+    ) +
+    report_theme +
+    report_theme +
+theme(
+  plot.title      = element_text(size = 22, face = "bold"),
+  axis.title.x    = element_text(size = 20, face = "bold", margin = margin(t = 6)),
+  axis.title.y    = element_text(size = 20, face = "bold", margin = margin(r = 6)),
+  axis.text.x     = element_text(size = 18),
+  axis.text.y     = element_text(size = 18),
+  legend.position = "none",
+  plot.margin      = margin(t = 15, r = 15, b = 15, l = 15),
+  plot.background  = element_rect(color = "grey60", linewidth = 1, fill = "white"),
+  panel.background = element_rect(fill = "white")
+)
+  
+  
+  
+  
+  air_income_plots_pres[[v$col]] <- p
+}
+
+dashboard_air_income_pres <- wrap_plots(air_income_plots_pres, ncol = 2) +
+  plot_annotation(
+    title = "Air Pollution by Household Income",
+    theme = theme(
+      plot.title      = element_text(hjust = 0.5, face = "bold", size = 28),
+      plot.margin     = margin(t = 20, r = 10, b = 10, l = 10),
+      plot.background = element_rect(fill = "grey90", color = NA)
+    )
+  )
+
+
+ggsave("Figures/air_pollution_income_dashboard_PRESENTATION.png",
+       plot = dashboard_air_income_pres, width = 18, height = 14, dpi = 300)
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1442,8 +1912,6 @@ subset_data %>%
 
 
 #horizontal bar chart of household income categories 
-library(tidyverse)
-
 subset_data %>%
   mutate(
     income_cat = factor(

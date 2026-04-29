@@ -29,7 +29,7 @@ The environmental variables come from the Canadian Urban Environmental Health Re
 
 ## 1.2 DNA methylation data 
 
-For DNA methylation profiling, 23,492 Comprehensive cohort participants provided baseline blood and urine samples, including EDTA whole blood and buffy coat [@zotero-item-786]. Of these 23,492 participants, 6,268 had fasted for at least 5 hours, and 3,000 of them were selected for genomics and metabolomics analyses. Additionally, from the remaining 20,492 participants, 7,000 were selected. From these 10,000 participants, a sub-sample of 1,500 was chosen for epigenetic analysis, of which 1,478 were successfully assayed. Sample selections were made to match the distribution of Comprehensive cohort by age, sex, and data collection site (Lin et al. 2022). 
+For DNA methylation profiling, 23,492 Comprehensive cohort participants provided baseline blood and urine samples, including EDTA whole blood and buffy coat [@zotero-item-786]. Of these, 6,268 had fasted for at least 5 hours, and 3,000 of them were selected for genomics and metabolomics analyses. Additionally, from the remaining 20,492 participants, 7,000 were selected. From these 10,000 participants, a sub-sample of 1,500 was chosen for epigenetic analysis, of which 1,478 were successfully assayed. Sample selections were made to match the distribution of Comprehensive cohort by age, sex, and data collection site (Lin et al. 2022). 
 
 DNAm PhenoAge was calculated following the method described by Levine et al. (reference). DNA methylation β‑values (percent methylation) were obtained for each of the 513 CpG sites included in the PhenoAge model. Each β‑value was multiplied by its corresponding weight from Levine’s model, and the weighted values were then summed. The intercept from the model was added to this sum, resulting in the DNAm PhenoAge estimate in years. 
 
@@ -72,29 +72,22 @@ All of the air pollution variables are 1 year averages prior to the first interv
 PM2.5 is measured in microgram/m$^3$. The other air pollution variables are measured in parts per billion (ppb). 
 
 
-
-
 ```{r table_airquality, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
 knitr::include_graphics("Tables/Table_airquality.png")
 ```
 
-<br>
-<br>
-
-### 2.3.2 Greenness (NDVI)
-
-Maximum of annual mean Normalized Difference Vegetation Index (NDVI) within 250m. Range is -1 to + 1.
-
-
-```{r table_ndvi, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
-knitr::include_graphics("Tables/Table_ndvi.png")
+```{r figure_airpollutiondashboard, echo=FALSE, fig.width=5,fig.height=3,out.width="100%",fig.cap="Figure X: Air pollution distributions."}
+knitr::include_graphics("Figures/air_pollution_dashboard.png")
 ```
 
+
+
+
 <br>
 <br>
 
 
-### 2.3.3 Housing problems: Condensation and noise 
+### 2.3.2 Housing problems: Condensation and noise 
 
 "Home problems: Condensation" measures if current home has problems with condensation (Yes or No). 
 "Home problems: Noise measures" if current home has problems with noise (Yes or No). 
@@ -106,7 +99,87 @@ knitr::include_graphics("Tables/Table_housing.png")
 <br>
 <br>
 
-### 2.3.4 Length of roads within certain distances 
+
+
+```{r figure_condensationbarplot, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Distribution of condensation problems in home."}
+knitr::include_graphics("Figures/condensation_bar.png")
+```
+
+
+```{r figure_noisebarplot, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Distribution of noise problems in home."}
+knitr::include_graphics("Figures/noise_bar.png")
+```
+
+
+
+
+
+
+
+
+### 2.3.3 Tree canopy coverage 
+
+Tree canopy is defined as area of vegetation (including leaves, stems, branches, etc.) of woody plants above 5m in height. The dataset developers derived tree canopy cover estimates from the Global Forest Cover Change (GFCC) Surface Reflectance product (GFCC30SR), which is based on enhanced Global Land Survey (GLS) datasets. The GLS datasets are composed of high-resolution Landsat 5 Thematic Mapper (TM) and Landsat 7 Enhanced Thematic Mapper Plus (ETM ) images at 30 meter resolution.CANUE staff retrieved tree canopy cover data from Google Earth Engine (GEE) for the year 2010 and 2015, extracted values (percent coverage) to postal codes and calculated summary measures (average percent coverage) within buffers of 100, 250, 500, and 1000 metres. Source: [CANUE metadata](https://www.canuedata.ca/metadata.php)
+
+
+```{r table_treecanopy, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
+knitr::include_graphics("Tables/Table_treecanopy.png")
+```
+
+<br>
+<br>
+
+
+The following dashboard shows Tree Canopy Coverage at varying distances from postal code.
+
+```{r figure_treecanopycoverage_histograms, echo=FALSE, fig.width=5,fig.height=3,out.width="100%",fig.cap="Figure X: Tree Canopy Coverage Distributions."}
+knitr::include_graphics("Figures/tree_canopy_dashboard.png")
+```
+
+
+
+
+### 2.3.4 Vegetative greenness fractions
+
+Vegetative greenness fractions: Users can interpret values as the percentage of green vegetation within each 30 m by 30 m pixel, but vegetative greenness fraction values are an indication of both the area coverage and intensity (i.e., strength of spectral signal) of all green vegetation within a 30 m by 30 m pixel. For instance, built environment factors (e.g. housing, asphalt) as well as tree canopy are accounted for in analysis, and therefore the presence of roads and buildings underneath canopy can yield lower greenness values. Water pixels were masked out using the Statistics Canada 2016 census water boundary files. CANUE staff assigned values to postal codes (1984-2016) as annual metrics and by calculating the mean and maximum of pixel level greenness within buffers of 100, 250, 500, and 1000 m. Source:[CANUE metadata](https://www.canuedata.ca/metadata.php)
+
+
+```{r table_percentveggreenness, echo=FALSE, fig.width=8, fig.height=5, out.width="100%"}
+knitr::include_graphics("Tables/Table_percentveg.png")
+```
+
+<br>
+<br>
+
+
+The following dashboard shows percent vegetative greenness at different distances from postal code centre (both mean of annual and maximum of annual). 
+
+```{r figure_%veggreeness, echo=FALSE, fig.width=5,fig.height=3,out.width="100%",fig.cap="Figure X: Percent vegetative greenness."}
+knitr::include_graphics("Figures/greenness_dashboard.png")
+```
+
+
+### 2.3.5 NDVI 
+
+Annual maximum NDVI calculated by Google from Landsat 5 and Landsat 8 were accessed via Google Earth Engine. These composites are created from all the scenes in each annual period beginning from the first day of the year and continuing to the last day of the year. All the images from each year are included in the composite, with the greenest pixel as the composite value, where the greenest pixel is the maximum value of the Normalized Difference Vegetation Index (NDVI). No data were available for 2012, due to decommissioning of Landsat 5 in 2011 prior to the start of Landsat 8 in 2013. No cross-calibration between the sensors was performed, please be aware there may be small bias differences between NDVI values calculated using Landsat 5 and Landsat 8. Final NDVI metrics were linked to all 6-digit DMTI Spatial single link postal code locations in Canada, and for surrounding areas within 100m, 250m, 500m, and 1km.
+[CANUE metadata](https://www.canuedata.ca/metadata.php)
+
+Looked at maximum of annual mean Normalized Difference Vegetation Index (NDVI) within 500m. 
+
+```{r table_ndvi, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
+knitr::include_graphics("Tables/Table_ndvi.png")
+```
+
+<br>
+<br>
+
+```{r figure_NDVI500, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Maximum Annual NDVI within 500m of postal code."}
+knitr::include_graphics("Figures/ndvi_500m_histogram.png")
+```
+
+
+
+### 2.3.6 Length of roads within varying distances of postal code center
 
 length of local/major roads within 200 m of 6 digit postal code center (2013)
 length of primary highway/expressway within 200 m of 6 digit postal code center (2013)
@@ -118,30 +191,16 @@ knitr::include_graphics("Tables/Table_roads.png")
 <br>
 <br>
 
-### 2.3.5 Tree canopy coverage and vegetative greenness fractions
-
-Tree canopy is defined as area of vegetation (including leaves, stems, branches, etc.) of woody plants above 5m in height. CANUE staff retrieved tree canopy cover data from Google Earth Engine (GEE) for the year 2010 and 2015, extracted values (percent coverage) to postal codes and calculated summary measures (average percent coverage) within buffers of 100, 250, 500, and 1000 metres.https://www.canuedata.ca/metadata.php
 
 
-```{r table_treecanopy, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
-knitr::include_graphics("Tables/Table_treecanopy.png")
-```
 
-<br>
-<br>
 
-Vegetative greenness fractions: Users can interpret values as the percentage of green vegetation within each 30 m by 30 m pixel, but vegetative greenness fraction values are an indication of both the area coverage and intensity (i.e., strength of spectral signal) of all green vegetation within a 30 m by 30 m pixel. For instance, built environment factors (e.g. housing, asphalt) as well as tree canopy are accounted for in analysis, and therefore the presence of roads and buildings underneath canopy can yield lower greenness values. Water pixels were masked out using the Statistics Canada 2016 census water boundary files. CANUE staff assigned values to postal codes (1984-2016) as annual metrics and by calculating the mean and maximum of pixel level greenness within buffers of 100, 250, 500, and 1000 m. https://www.canuedata.ca/metadata.php
+\newpage
 
 ## 2.4 Aging Outcomes 
 
-
-
-
-```{r table_percentveggreenness, echo=FALSE, fig.width=8, fig.height=5, out.width="100%"}
-knitr::include_graphics("Tables/Table_percentveg.png")
-```
-
 \newpage
+
 
 # 3.0 Environmental variables by income 
 
@@ -150,49 +209,40 @@ knitr::include_graphics("Tables/Table_percentveg.png")
 All of the air pollution variables are 1 year averages prior to the first interview date, and are averages of National Air Pollution Surveillance station (NAPS) locations within 50 km. 
 PM2.5 is measured in microgram/m$^3$. The other air pollution variables are measured in parts per billion (ppb). 
 
-```{r figure_PM2.5, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Annual average PM2.5 by household income group"}
-knitr::include_graphics("Figures/PM2.5_by_income_group.png")
-```
 
-\newpage
-
-```{r figure_no2, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Annual average NO2 concentration by household income group"}
-knitr::include_graphics("Figures/NO2_by_income_group.png")
-```
-
-\newpage
-
-```{r figure_so2, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Annual average SO2 concentration by household income group"}
-knitr::include_graphics("Figures/SO2_by_income_group.png")
-```
-
-\newpage
-
-```{r figure_ozone, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Annual average Ozone concentration by household income group"}
-knitr::include_graphics("Figures/Ozone_by_income_group.png")
+```{r figure_airpollution_income_dashboard, echo=FALSE, fig.width=5,fig.height=3,out.width="110%",fig.cap="Figure X: Air pollution measures by income group."}
+knitr::include_graphics("Figures/air_pollution_income_dashboard.png")
 ```
 
 
-## 3.2 NDVI (Greenness) by Income Group 
+<br><br><br>
+
+The figure below shows PM2.5 median by income group, which more clearly shows a trend, though the differences within PM2.5 exposure appear small. However, the World Health Organization PM2.5 annual air quality guideline level is 5 ug/m3, as effects can occur at lower levels of exposure. https://iris.who.int/server/api/core/bitstreams/551b515e-2a32-4e1a-a58c-cdaecd395b19/content
+Knowing this, even small differences in this exposure could make a difference in health impacts. 
 
 
-```{r figure_ndvi, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Maximum NDVI within 500 m by household income group"}
-knitr::include_graphics("Figures/NDVI_by_income_group.png")
+```{r figure_PM25median_dot_plot, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
+knitr::include_graphics("Figures/pm25_median_dot.png")
 ```
+
+
 
 
 \newpage
 
-## 3.3 Condensation problems by Income Group 
+## 3.2 Condensation problems by Income Group 
 
 54 participants had homes with condensation problems, while 1348 participants did not. The following figure shows the income distribution of participants who had condensation problems. 
 
 ```{r figure_condensation, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Number of homes with condensation by household income group"}
-knitr::include_graphics("Figures/Condensation_by_income_group.png")
+knitr::include_graphics("Figures/barplot_condensation.png")
 ```
 
 
-## 3.4 Tree Canopy Coverage By Income Group 
+## 3.3 Tree Canopy Coverage By Income Group 
+
+
+Figures X–X show tree canopy coverage (vegetation >5m) by household income group across five spatial buffers (postal code, 100m, 250m, 500m, and 1km). Across all buffer sizes, the distribution of vegetation coverage was similar across income groups, with median values and interquartile ranges showing no consistent gradient. These findings suggest that in this sample of Canadian urban dwellers, tree canopy coverage is not meaningfully stratified by household income.
 
 ```{r figure_veg01, echo=FALSE, fig.width=5, fig.height=4, out.width="80%", fig.cap="Figure X: Vegetation cover (>5m) by income group"}
 knitr::include_graphics("Figures/boxplot_vegetation_01.png")
@@ -215,11 +265,22 @@ knitr::include_graphics("Figures/boxplot_vegetation_05.png")
 ```
 
 
+## 3.4 Vegetative greenness fractions by income 
+
+There is no pattern in vegetative greenness fraction by income group. The values are all clustered between 26–31%. This variable measures all green vegetation including grass, shrubs, parks. 
 
 
+```{r table_vegetative_greenness_fraction, echo=FALSE, fig.width=8, fig.height=5, out.width="100%"}
+knitr::include_graphics("Tables/Table_veg_green_fraction_byincome.png")
+```
 
 
+## 3.5 NDVI (Greenness) by Income Group 
 
+
+```{r figure_ndvi, echo=FALSE, fig.width=5,fig.height=3,out.width="80%",fig.cap="Figure X: Maximum NDVI within 500 m by household income group"}
+knitr::include_graphics("Figures/NDVI_by_income_group.png")
+```
 
 
 

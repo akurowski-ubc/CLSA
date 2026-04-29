@@ -1,3 +1,4 @@
 data/
 *.rds
 *.csv
+.Rproj.user
