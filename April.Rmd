@@ -23,8 +23,6 @@ knitr::opts_chunk$set(
 #load data 
 
 load("data/CLSA_methylation.rds")
-grep("GRUMPY", names(CLSA_methylation), ignore.case = TRUE, value = TRUE) #check for certain variables in the dataset 
-
 
 library(dplyr)
 library(ggplot2)
@@ -40,30 +38,38 @@ library(Hmisc)
 library(htmltools)
 library(webshot2)
 library(tidyverse)
-library(ggplot2)
 
 
-
+#not going to include these: 
+#"ED_HIGH_COM", "WEA_SVNGSVL_MCQ","temp_1yr_com" LGTNLTYY_01_COM "ENV_HMPRB_NOI_MCQ","pm25_5yrs_com",   "PM25DALYY_02_COM", "no2_5yrs_com", 
+ # "Locrds_length_200m_com",   "Phwy_length_200m_com", 
 
 #create a subset 
 subset_data <- CLSA_methylation[, c(
+  "entity_id.x", 
+  
   "AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7",
   
   # Socioeconomic
-  "INC_TOT_COM", "ED_HIGH_COM", "WEA_SVNGSVL_MCQ",
+  "INC_TOT_COM", "WEA_SVNGSVL_MCQ",
   
   # Outcomes
   "GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC",
   
   # Environmental exposures
-  "pm25_1yr_com", "no2_1yr_com", "o3_1yr_com", "GRLANYY_26_COM", "temp_1yr_com",
-  "LGTNLTYY_01_COM",   "ENV_HMPRB_CON_MCQ", "ENV_HMPRB_NOI_MCQ", "pm25_5yrs_com",   "PM25DALYY_02_COM", "no2_5yrs_com", "so2_1yr_com",
+  "pm25_1yr_com", "no2_1yr_com", "so2_1yr_com", "o3_1yr_com", "GRLANYY_26_COM",
+    "ENV_HMPRB_CON_MCQ",
   
-  "Locrds_length_200m_com",   "Phwy_length_200m_com", 
+  #CANUE Linked environmental variables 
   
-  "grtcc10_01_COM",   "grtcc10_02_COM",   "grtcc10_03_COM",   "grtcc10_04_COM",  "grtcc10_05_COM",   
+  "PM25DALYY_01_COM",  "O3CHGYY_01_COM",  "SO2OMIYY_COM", 
+  
+  
+  "grtcc10_01_COM",   "grtcc10_02_COM",   "grtcc10_03_COM",   "grtcc10_04_COM",  "grtcc10_05_COM",  #tree canopy coverage 
+  
   "GRUMPYY_01_COM",  "GRUMPYY_02_COM", "GRUMPYY_03_COM",   "GRUMPYY_04_COM",   "GRUMPYY_05_COM",   "GRUMPYY_06_COM",   "GRUMPYY_07_COM",
-  "GRUMPYY_08_COM",   "GRUMPYY_09_COM",
+  "GRUMPYY_08_COM",   "GRUMPYY_09_COM", #%vegetative greenness 
+  
   
   
   # Lifestyle / behavioral
@@ -74,45 +80,30 @@ subset_data <- CLSA_methylation[, c(
   
 )]
 
-colSums(is.na(subset_data))#check number of NAs
-#savings 103; education 229; noise 76; condensation 76; pa2 76; alcohol 36
-
 
 ```
 
 
 
 
-## 1.1 Recode missing values to N/A
+## Recode missing values to N/A
 
 ```{r}
-
-str(subset_data$pm25_1yr_com) #numeric
-str(subset_data$no2_1yr_com) #numeric
-str(subset_data$o3_1yr_com) #numeric
-str(subset_data$GRLANYY_26_COM) #numeric
-str(subset_data$temp_1yr_com) #numeric
-str(subset_data$LGTNLTYY_01_COM) #light is an integer 
-subset_data$LGTNLTYY_01_COM <- as.numeric(subset_data$LGTNLTYY_01_COM) #make light numeric
-
-
-subset_data$pm25_1yr_com[subset_data$pm25_1yr_com == -8888] <- NA  #recode =8888 to missing for these variables 
-subset_data$pm25_5yrs_com[subset_data$pm25_5yrs_com == -8888] <- NA  #recode =8888 to missing for these variables 
-subset_data$no2_1yr_com[subset_data$no2_1yr_com == -8888] <- NA #NO2
-subset_data$so2_1yr_com[subset_data$so2_1yr_com == -8888] <- NA #NO2
-subset_data$o3_1yr_com[subset_data$o3_1yr_com == -8888] <- NA #ozone
-subset_data$GRLANYY_26_COM[subset_data$GRLANYY_26_COM == -8888] <- NA #greeness
-subset_data$LGTNLTYY_01_COM[subset_data$LGTNLTYY_01_COM == -8888] <- NA #light 
-subset_data$temp_1yr_com[subset_data$temp_1yr_com == -8888] <- NA#temperature
-subset_data$Locrds_length_200m_com[subset_data$Locrds_length_200m_com == -8888] <- NA#length of roads within 200m
-subset_data$Phwy_length_200m_com[subset_data$Phwy_length_200m_com == -8888] <- NA#length of hwy within 200m
-
+# Recode first
+subset_data$pm25_1yr_com[subset_data$pm25_1yr_com %in% c(-8888, -9999)] <- NA
+subset_data$no2_1yr_com[subset_data$no2_1yr_com %in% c(-8888, -9999)] <- NA
+subset_data$so2_1yr_com[subset_data$so2_1yr_com %in% c(-8888, -9999)] <- NA
+subset_data$o3_1yr_com[subset_data$o3_1yr_com %in% c(-8888, -9999)] <- NA
+subset_data$GRLANYY_26_COM[subset_data$GRLANYY_26_COM %in% c(-8888, -9999)] <- NA
+subset_data$ENV_HMPRB_CON_MCQ[subset_data$ENV_HMPRB_CON_MCQ %in% c(-8888, -9999)] <- NA
+subset_data$PM25DALYY_01_COM[subset_data$PM25DALYY_01_COM %in% c(-8888, -9999)] <- NA
+subset_data$O3CHGYY_01_COM[subset_data$O3CHGYY_01_COM %in% c(-8888, -9999)] <- NA
+subset_data$SO2OMIYY_COM[subset_data$SO2OMIYY_COM %in% c(-8888, -9999)] <- NA
 subset_data$grtcc10_01_COM[subset_data$grtcc10_01_COM %in% c(-8888, -9999)] <- NA
 subset_data$grtcc10_02_COM[subset_data$grtcc10_02_COM %in% c(-8888, -9999)] <- NA
 subset_data$grtcc10_03_COM[subset_data$grtcc10_03_COM %in% c(-8888, -9999)] <- NA
 subset_data$grtcc10_04_COM[subset_data$grtcc10_04_COM %in% c(-8888, -9999)] <- NA
 subset_data$grtcc10_05_COM[subset_data$grtcc10_05_COM %in% c(-8888, -9999)] <- NA
-
 subset_data$GRUMPYY_01_COM[subset_data$GRUMPYY_01_COM %in% c(-8888, -9999)] <- NA
 subset_data$GRUMPYY_02_COM[subset_data$GRUMPYY_02_COM %in% c(-8888, -9999)] <- NA
 subset_data$GRUMPYY_03_COM[subset_data$GRUMPYY_03_COM %in% c(-8888, -9999)] <- NA
@@ -123,74 +114,160 @@ subset_data$GRUMPYY_07_COM[subset_data$GRUMPYY_07_COM %in% c(-8888, -9999)] <- N
 subset_data$GRUMPYY_08_COM[subset_data$GRUMPYY_08_COM %in% c(-8888, -9999)] <- NA
 subset_data$GRUMPYY_09_COM[subset_data$GRUMPYY_09_COM %in% c(-8888, -9999)] <- NA
 
+# Then check — should all be 0
+sapply(subset_data, function(x) sum(x %in% c(-8888, -9999), na.rm = TRUE))
+
+colSums(is.na(subset_data))#check number of NAs
+
+
+
+
+
+
+#show how many NAs are in each variable (in a table)
+na_summary <- data.frame(
+  Variable = names(subset_data),
+  N_Missing = colSums(is.na(subset_data)),
+  Pct_Missing = round(colSums(is.na(subset_data)) / nrow(subset_data) * 100, 1)
+) %>%
+  filter(N_Missing > 0) %>%  # only show variables that have missing data
+  arrange(desc(N_Missing))
+
+ft_na <- flextable(na_summary) %>%
+  set_header_labels(
+    Variable = "Variable",
+    N_Missing = "N Missing",
+    Pct_Missing = "% Missing"
+  ) %>%
+  add_header_lines("Table X. Missing Data Summary") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("N_Missing", "Pct_Missing"), align = "center", part = "body")
+
+ft_na
+save_as_image(ft_na, path = "Tables/Table_missing.png", res = 300)
+
 ```
 
 
 
 
-## 1.2 Reverse code Household Income, Savings
+
+## Reverse code Household Income
 
 ```{r}
-#SEC 
-#household income
-table(subset_data$INC_TOT_COM, useNA = "ifany")#categories are 1,2,3,4,5,8,9. 8="Don't know/No answer", 9=refused. 7=missing but there are none of these. 
+# BEFORE reversing
+cat("=== BEFORE reverse coding ===\n")
+table(subset_data$INC_TOT_COM, useNA = "ifany")
+# 1 = Less than $20,000; 2 = $20,000–$49,999; 3 = $50,000–$99,999
+# 4 = $100,000–$149,999; 5 = $150,000 or more; 8 = Don't know/No answer; 9 = Refused
 
-#before reversing:
-# 1 = Less than $20,000; 2 = $20,000–$49,999; 3 = $50,000–$99,999; 4 = $100,000–$149,999; 5 = $150,000 or more; 7 = Missing; 8 = Don't know/No answer; 9 = Refused
-
-#after reversing: 
-# 1 = $150,000 or more ; 2 = $100,000–$149,999 ; 3 = $50,000–$99,999; 4 = $20,000–$49,999; 5 = Less than $20,000; 6=  Don't know/No answer/Refused
-
-subset_data$INC_TOT_COM_RECODED <- dplyr::case_when( #reverse code so that 1=5, 2=4, 3=3, 4=2, 5=1, and 6=8,9 
+subset_data$INC_TOT_COM_RECODED <- dplyr::case_when(
   subset_data$INC_TOT_COM == 1 ~ 5,
   subset_data$INC_TOT_COM == 2 ~ 4,
   subset_data$INC_TOT_COM == 3 ~ 3,
   subset_data$INC_TOT_COM == 4 ~ 2,
   subset_data$INC_TOT_COM == 5 ~ 1,
   subset_data$INC_TOT_COM %in% c(8, 9) ~ 6,
-  TRUE ~ NA_real_   
+  TRUE ~ NA_real_
 )
-table(subset_data$INC_TOT_COM_RECODED)
+
+# AFTER reversing
+cat("\n=== AFTER reverse coding ===\n")
+table(subset_data$INC_TOT_COM_RECODED, useNA = "ifany")
+# 1 = $150,000+; 2 = $100,000–$149,999; 3 = $50,000–$99,999
+# 4 = $20,000–$49,999; 5 = Less than $20,000; 6 = Don't know/No answer/Refused
+
 subset_data$INC_TOT_COM <- subset_data$INC_TOT_COM_RECODED
-sum(is.na(subset_data$INC_TOT_COM)) #number of NAs is 0
+cat("\nNAs in INC_TOT_COM after recoding:", sum(is.na(subset_data$INC_TOT_COM)), "\n")
+subset_data <- subset_data %>% select(-INC_TOT_COM_RECODED) 
+
+# Create income_cat factor
+subset_data <- subset_data %>%
+  mutate(
+    income_cat = factor(
+      INC_TOT_COM,
+      levels = c(1, 2, 3, 4, 5, 6),
+      labels = c("150K+", "100K–150K", "50K–100K", "20K–50K", "<20K", "Don't know/No answer/Refused")
+    )
+  )
+
+# Final check
+cat("\n=== income_cat factor (final) ===\n")
+table(subset_data$income_cat, useNA = "ifany")
 
 
-#savings 
-table(subset_data$WEA_SVNGSVL_MCQ, useNA = "ifany") #categories are #1 = Less than $50,000; 2 = $50,000–$99,999; 3 = $100,000–$999,999; 4 = $1 million or more; 8 = Don’t know/No answer; 9 = Refused
-#there are 103 NAs to start with. 
+```
 
-subset_data$WEA_SVNGSVL_MCQ_RECODED <- dplyr::case_when( #reverse code so that 1=4, 2=3, 3=2, 4=1, 5=8,9 
+
+WEA_SVNGSVL_MCQ
+
+## Reverse code Savings
+
+```{r}
+
+# BEFORE reversing
+cat("=== BEFORE reverse coding ===\n")
+table(subset_data$WEA_SVNGSVL_MCQ, useNA = "ifany")
+# 1 = Less than $50,000; 2 = $50,000–$99,999; 3 = $100,000–<$1 million
+# 4 = $1 million or more; 8 = Don't know/No answer; 9 = Refused
+
+subset_data$WEA_SVNGSVL_MCQ_RECODED <- dplyr::case_when(
   subset_data$WEA_SVNGSVL_MCQ == 1 ~ 4,
   subset_data$WEA_SVNGSVL_MCQ == 2 ~ 3,
   subset_data$WEA_SVNGSVL_MCQ == 3 ~ 2,
   subset_data$WEA_SVNGSVL_MCQ == 4 ~ 1,
   subset_data$WEA_SVNGSVL_MCQ %in% c(8, 9) ~ 5,
-  TRUE ~ NA_real_   
+  TRUE ~ NA_real_
 )
+
+# AFTER reversing
+cat("\n=== AFTER reverse coding ===\n")
+table(subset_data$WEA_SVNGSVL_MCQ_RECODED, useNA = "ifany")
+# 1 = $1 million+; 2 = $100,000–<$1 million; 3 = $50,000–$99,999
+# 4 = Less than $50,000; 5 = Don't know/No answer/Refused
+
 subset_data$WEA_SVNGSVL_MCQ <- subset_data$WEA_SVNGSVL_MCQ_RECODED
-table(subset_data$WEA_SVNGSVL_MCQ, useNA = "ifany")#103 NAs 
 
+cat("\nNAs in WEA_SVNGSVL_MCQ after recoding:", sum(is.na(subset_data$WEA_SVNGSVL_MCQ)), "\n")
+subset_data <- subset_data %>% select(-WEA_SVNGSVL_MCQ_RECODED)
 
-#education 
-# Step 1: Coerce to numeric safely (from character/factor labels)
-# Step 2: Set invalid categories to NA (97 = other, 98 = don't know, 99 = refused)
-# Step 3: Reverse code only valid numeric values (1–6)
-# Step 4: Convert to factor
-# Step 5: Optional – drop unused factor levels (e.g., if -90 or others existed)
-# Step 6: Check
-#check NAs
+# Create savings_cat factor
+subset_data <- subset_data %>%
+  mutate(
+    savings_cat = factor(
+      WEA_SVNGSVL_MCQ,
+      levels = c(1, 2, 3, 4, 5),
+      labels = c("$1M+", "$100K–<$1M", "$50K–$100K", "<$50K", "Don't know/No answer/Refused")
+    )
+  )
 
-table(subset_data$ED_HIGH_COM)
-subset_data$ED_HIGH_COM <- as.numeric(as.character(subset_data$ED_HIGH_COM))
-subset_data$ED_HIGH_COM[subset_data$ED_HIGH_COM %in% c(97, 98, 99)] <- NA
-subset_data$ED_HIGH_COM <- ifelse(!is.na(subset_data$ED_HIGH_COM), 7 - subset_data$ED_HIGH_COM, NA)
-subset_data$ED_HIGH_COM <- factor(subset_data$ED_HIGH_COM)
-subset_data$ED_HIGH_COM <- droplevels(subset_data$ED_HIGH_COM)
-table(subset_data$ED_HIGH_COM, useNA = "ifany") #231 NAs 
-
-saveRDS(subset_data, file = "subset_data.rds")
+# Final check
+cat("\n=== savings_cat factor (final) ===\n")
+table(subset_data$savings_cat, useNA = "ifany")
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 General Code needed for plots 
@@ -224,14 +301,7 @@ report_theme <- theme_classic(base_size = 11) +
     axis.text.y = element_text(size = 10)
   )
 
-# Shared income labels
-income_labels <- c(
-  "<20K",
-  "20K–50K",
-  "50K–100K",
-  "100K–150K",
-  "150K+"
-)
+
 ```
 
 
@@ -241,8 +311,7 @@ income_labels <- c(
 
 
 
-
-## 1.3 Reference info about variable names (new enviro variables) 
+## Reference info about variable names (new enviro variables) 
 
 
 Tree canopy:
@@ -384,13 +453,66 @@ ggsave("Figures/ethnicity_barplot.png", plot = p_ethnicity, width = 5, height = 
 ```
 
 
+```{r}
+#province
+
+
+
+province_labels <- c(
+  "1"  = "Alberta",
+  "2"  = "British Columbia",
+  "3"  = "Manitoba",
+  "4"  = "New Brunswick",
+  "5"  = "Newfoundland and Labrador",
+  "6"  = "Nova Scotia",
+  "7"  = "Ontario",
+  "8"  = "Prince Edward Island",
+  "9"  = "Quebec",
+  "10" = "Saskatchewan"
+)
+
+prov <- subset_data$WGHTS_PROV_COM
+
+prov_counts <- table(factor(prov, levels = names(province_labels)))
+prov_pct    <- round(prop.table(prov_counts) * 100, 1)
+n_missing   <- sum(is.na(prov))
+pct_missing <- round(mean(is.na(prov)) * 100, 1)
+
+summary_table_province <- tibble(
+  Province = c(province_labels[names(prov_counts)], "Missing"),
+  `n (%)`  = c(
+    paste0(prov_counts, " (", prov_pct, "%)"),
+    paste0(n_missing, " (", pct_missing, "%)")
+  )
+)
+
+ft_province <- flextable(summary_table_province) %>%
+  add_header_lines("Table X. Distribution of Participants by Province") %>%
+  bold(part = "header") %>%
+  bold(j = "Province") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = "n (%)", align = "center", part = "body")
+
+save_as_image(ft_province, path = "Tables/Table_province.png", res = 300)
+```
+
+
 
 
 ## 2.2 Socioeconomic variables: Household Income and Wealth 
 
+
 ```{r}
-#after reversing: 
-# 1 = $150,000 or more ; 2 = $100,000–$149,999 ; 3 = $50,000–$99,999; 4 = $20,000–$49,999; 5 = Less than $20,000; 6=  Don't know/No answer/Refused
+
+#summary table of household income
+#after reversing: 1 = $150,000 or more ; 2 = $100,000–$149,999 ; 3 = $50,000–$99,999; 4 = $20,000–$49,999; 5 = Less than $20,000; 6=  Don't know/No answer/Refused
 
 subset_data %>%
   count(INC_TOT_COM) %>%
@@ -399,32 +521,9 @@ subset_data %>%
   )
 
 
-#savings categories after reverse code are: 1=1 million or more. 2=100k to 1 million. 3=50-100k. 4=<50K. 5=don't know/no answer/refused 
-subset_data %>%
-  count(WEA_SVNGSVL_MCQ) %>%
-  mutate(
-    percent = round(100 * n / sum(n), 1)
-  )
-```
-
-
-```{r}
-
 # household income barplot 
-subset_data <- subset_data %>%# Add income_cat to subset_data 
-  mutate(
-    income_cat = factor(
-      INC_TOT_COM,
-      levels = c(1, 2, 3, 4, 5, 7, 8, 9),
-      labels = c("<20K", "20K–50K", "50K–100K", "100K–150K",
-                 "150K+", "Missing", "Don't know/No answer", "Refused")
-    )
-  )
-
-# Household income barplot
 p_income <- subset_data %>%
   count(income_cat, name = "n") %>%
-  arrange(n) %>%
   ggplot(aes(x = n, y = income_cat)) +
   geom_col(fill = "#2C7FB8", width = 0.7) +
   labs(
@@ -441,6 +540,12 @@ ggsave("Figures/household_income_barplot.png", plot = p_income, width = 5, heigh
 
 
 
+#savings categories after reverse code are: 1=1 million or more. 2=100k to 1 million. 3=50-100k. 4=<50K. 5=don't know/no answer/refused 
+subset_data %>%
+  count(WEA_SVNGSVL_MCQ) %>%
+  mutate(
+    percent = round(100 * n / sum(n), 1)
+  )
 
 # savings/wealth barplot 
 p_wealth <- subset_data %>%
@@ -479,6 +584,88 @@ ggsave("Figures/savings_barplot.png", plot = p_wealth, width = 5, height = 4, dp
 # 3.0 Environmental Variables 
 
 ## 3.1 Pollution variables 
+
+
+### 3.1.1 Compare PM25DALE_AYY_01 and pm25_1yr_com etc. 
+
+PM25DALYY_01_COM
+SO2OMIYY_COM
+O3CHGYY_01_COM
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+
+# ── PM2.5 ──────────────────────────────────────────────────────────────────────
+df_long <- subset_data %>%
+  select(PM25DALYY_01_COM, pm25_1yr_com) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value))
+
+p_pm25_density <- ggplot(df_long, aes(x = value, fill = variable, color = variable)) +
+  geom_density(alpha = 0.4) +
+  labs(title = "Distribution Comparison: PM25DALYY_01_COM vs pm25_1yr_com",
+       x = "PM2.5 Value", y = "Density") +
+  theme_minimal()
+ggsave("Figures/pm25_comparison_density.png", plot = p_pm25_density, width = 5, height = 4, dpi = 300)
+
+p_pm25_boxplot <- ggplot(df_long, aes(x = variable, y = value, fill = variable)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = 21) +
+  labs(title = "Boxplot Comparison: PM25DALYY_01_COM vs pm25_1yr_com",
+       x = "", y = "PM2.5 Value") +
+  theme_minimal()
+ggsave("Figures/pm25_comparison_boxplot.png", plot = p_pm25_boxplot, width = 5, height = 4, dpi = 300)
+
+summary(subset_data[, c("PM25DALYY_01_COM", "pm25_1yr_com")])
+
+# ── SO2 ────────────────────────────────────────────────────────────────────────
+df_long <- subset_data %>%
+  select(so2_1yr_com, SO2OMIYY_COM) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value))
+
+p_so2_density <- ggplot(df_long, aes(x = value, fill = variable, color = variable)) +
+  geom_density(alpha = 0.4) +
+  labs(title = "Distribution Comparison: so2_1yr_com vs SO2OMIYY_COM",
+       x = "SO2 Value", y = "Density") +
+  theme_minimal()
+ggsave("Figures/so2_comparison_density.png", plot = p_so2_density, width = 5, height = 4, dpi = 300)
+
+p_so2_boxplot <- ggplot(df_long, aes(x = variable, y = value, fill = variable)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = 21) +
+  labs(title = "Boxplot Comparison: so2_1yr_com vs SO2OMIYY_COM",
+       x = "", y = "SO2 Value") +
+  theme_minimal()
+ggsave("Figures/so2_comparison_boxplot.png", plot = p_so2_boxplot, width = 5, height = 4, dpi = 300)
+
+summary(subset_data[, c("so2_1yr_com", "SO2OMIYY_COM")])
+
+# ── Ozone ──────────────────────────────────────────────────────────────────────
+df_long <- subset_data %>%
+  select(O3CHGYY_01_COM, o3_1yr_com) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value))
+
+p_o3_density <- ggplot(df_long, aes(x = value, fill = variable, color = variable)) +
+  geom_density(alpha = 0.4) +
+  labs(title = "Distribution Comparison: O3CHGYY_01_COM vs o3_1yr_com",
+       x = "O3 Value", y = "Density") +
+  theme_minimal()
+ggsave("Figures/o3_comparison_density.png", plot = p_o3_density, width = 5, height = 4, dpi = 300)
+
+p_o3_boxplot <- ggplot(df_long, aes(x = variable, y = value, fill = variable)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = 21) +
+  labs(title = "Boxplot Comparison: O3CHGYY_01_COM vs o3_1yr_com",
+       x = "", y = "O3 Value") +
+  theme_minimal()
+ggsave("Figures/o3_comparison_boxplot.png", plot = p_o3_boxplot, width = 5, height = 4, dpi = 300)
+
+summary(subset_data[, c("O3CHGYY_01_COM", "o3_1yr_com")])
+
+```
+
 
 
 ```{r}
@@ -982,22 +1169,14 @@ str(subset_data$DNAmIC)
 
 # 5.0 Environmental variables by income (Pollution, condensation) 
 
-## 5.1 Pollution by income 
+## Pollution by income 
 ```{r}
 
 #pollution boxplots by income group 
 
 
-# Shared income labels
-income_labels <- c(
-  "<20K",
-  "20K–50K",
-  "50K–100K",
-  "100K–150K",
-  "150K+"
-)
-
-ggplot(df, aes(x = income_cat, y = pm25_1yr_com)) +
+plot_data <- subset_data
+ggplot(data = plot_data, aes(x = income_cat, y = pm25_1yr_com)) +
   geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
   labs(
     title = "PM2.5 1 y average, by Income Group",
@@ -1071,13 +1250,143 @@ ggplot(df_greenness, aes(x = income_cat, y = GRLANYY_26_COM)) +
 ggsave("Figures/boxplot_ndvi.png", width = 5, height = 4, dpi = 300)
 
 
+```
+
+
+
+## Pollution by income using the potentially better variables 
+
+
+PM25DALYY_01_COM
+SO2OMIYY_COM
+O3CHGYY_01_COM
+
+
+```{r}
+
+#PM25DALYY_01_COM by Income Group 
+
+plot_data <- subset_data
+
+ggplot(data = plot_data, aes(x = income_cat, y = PM25DALYY_01_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "PM2.5 1 year average, by Income Group",
+    x = "Household Income",
+    y = "PM2.5 (satellite, model-based) (µg/m³)"
+  ) +
+  report_theme
+ggsave("Figures/boxplot_PM25DALYY_01_COM.png", width = 5, height = 4, dpi = 300)
+
+
+
+plot_data %>% #check that there is significance for PM2.5 
+  group_by(income_cat) %>%
+  summarise(
+    n = n(),
+    median_pm25 = median(PM25DALYY_01_COM, na.rm = TRUE),
+    mean_pm25 = round(mean(PM25DALYY_01_COM, na.rm = TRUE), 2)
+  )
+kruskal.test(PM25DALYY_01_COM ~ income_cat, data = df)
+
+
+
+
+
+
+
+ggplot(plot_data, aes(x = income_cat, y = SO2OMIYY_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "SO2 3 year annual average at postal code, by Income Group",
+    x = "Household Income",
+    y = "3 y average SO2 (satellite derived)(ppb)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_SO2OMIYY_COM.png", width = 5, height = 4, dpi = 300)
+
+
+
+ggplot(plot_data, aes(x = income_cat, y = O3CHGYY_01_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "O3 annual average ground-level at postal code, by Income Group",
+    x = "Household Income",
+    y = "Annual average O3 (model-based) (ppb)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_O3CHGYY_01_COM.png", width = 5, height = 4, dpi = 300)
+
+
+
+
+```
+
+
+##Pollution by wealth (savings)
+
+
+
+
+```{r}
+# PM25DALYY_01_COM by Savings/Wealth Group
+plot_data <- subset_data
+
+ggplot(data = plot_data, aes(x = savings_cat, y = PM25DALYY_01_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "PM2.5 1 year average, by Total Savings/Investments",
+    x = "Total Savings/Investments",
+    y = "PM2.5 (satellite, model-based) (µg/m³)"
+  ) +
+  report_theme
+ggsave("Figures/boxplot_PM25DALYY_01_COM_savings.png", width = 5, height = 4, dpi = 300)
+
+
+ggplot(plot_data, aes(x = savings_cat, y = SO2OMIYY_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "SO2 3 year annual average, by Total Savings/Investments",
+    x = "Total Savings/Investments",
+    y = "3 y average SO2 (satellite derived) (ppb)"
+  ) +
+  report_theme
+ggsave("Figures/boxplot_SO2OMIYY_COM_savings.png", width = 5, height = 4, dpi = 300)
+
+ggplot(plot_data, aes(x = savings_cat, y = O3CHGYY_01_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "O3 annual average, by Total Savings/Investments",
+    x = "Total Savings/Investments",
+    y = "Annual average O3 (model-based) (ppb)"
+  ) +
+  report_theme
+ggsave("Figures/boxplot_O3CHGYY_01_COM_savings.png", width = 5, height = 4, dpi = 300)
 
 
 ```
 
 
 
-### 3.1.2 PM2.5 median dot plot, by income group 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 5.1.2 PM2.5 median dot plot, by income group 
 
 
 ```{r}
@@ -1151,6 +1460,21 @@ dashboard_air_income <- dashboard_air_income +
 
 ggsave("Figures/air_pollution_income_dashboard.png", plot = dashboard_air_income, width = 16, height = 13, dpi = 300)
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1438,44 +1762,631 @@ ggsave("Figures/localroad_median_dot.png", plot = p_local_dot,
 
 
 
-# 6.0 Sample regressions for presentation? 
+# 6.0 Multiple linear regressions
+## 6.1 Income predicting aging (stratified by age)
 
 ```{r}
-#factor variables 
-str(subset_data %>%
-      dplyr::select(
-        pm25_1yr_com,
-        INC_TOT_COM,
-        SEX_ASK_COM,
-        AGE_NMBR_COM,
-        WGHTS_PROV_COM,
-        Race7
-      ))
 
-subset_data <- subset_data %>%
-  mutate(
-    INC_TOT_COM_factor     = factor(INC_TOT_COM),
-    SEX_ASK_COM_factor     = factor(SEX_ASK_COM),
-    WGHTS_PROV_COM_factor  = factor(WGHTS_PROV_COM)
-  )
-
-model <- lm(so2_1yr_com ~ INC_TOT_COM_factor + SEX_ASK_COM_factor + AGE_NMBR_COM + #PM2.5
-              WGHTS_PROV_COM_factor + Race7,
-            data = subset_data)
-summary(model)
-results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
-write.csv(results, "Results1.csv", row.names = FALSE)
+#make variables into factors first 
+subset_data$SEX_ASK_COM  <- as.factor(subset_data$SEX_ASK_COM)
+subset_data$Race7        <- as.factor(subset_data$Race7)
+subset_data$INC_TOT_COM  <- as.factor(subset_data$INC_TOT_COM)
+subset_data$WGHTS_PROV_COM <- as.factor(subset_data$WGHTS_PROV_COM)
+str(subset_data[, c("SEX_ASK_COM", "Race7", "INC_TOT_COM", "WGHTS_PROV_COM")])#now these are factors 
 
 
+class(subset_data$AGE_NMBR_COM)#these are integers, ok to leave alone
+class(subset_data$CD4nv) 
 
-model <- lm(GRLANYY_26_COM ~ INC_TOT_COM_factor + SEX_ASK_COM_factor + AGE_NMBR_COM + #GRLANYY_26_COM
-              WGHTS_PROV_COM_factor + Race7,
-            data = subset_data)
-summary(model)
-results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
-write.csv(results, "Results9.csv", row.names = FALSE)
+
+# Regression: Income predicting biological aging
+#stratified by age 
+subset_data$age_group <- ifelse(subset_data$AGE_NMBR_COM < 65, "45-64", "65-85")
+subset_data_firstgrp  <- subset_data[subset_data$age_group == "45-64", ]
+subset_data_secondgrp <- subset_data[subset_data$age_group == "65-85", ]
+
+table(subset_data$INC_TOT_COM) #make sure it is reverse coded 
+
+
+#GrimAGe 
+library(broom)
+model <- lm(GrimAge_EAA ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_firstgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+model <- lm(GrimAge_EAA ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_secondgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+
+
+#PhenoAge 
+library(broom)
+model <- lm(PhenoAge_EAA ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_firstgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+model <- lm(PhenoAge_EAA ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_secondgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+#DunedinPACE 
+
+model <- lm(DunedinPACE ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_firstgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+model <- lm(DunedinPACE ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_secondgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+
+#DNAmIC 
+model <- lm(DNAmIC ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_firstgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+model <- lm(DNAmIC ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_secondgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
 
 ```
+
+## 6.2 Income predicting environmental 
+### 6.2.1 Income predicting air pollution 
+
+```{r}
+#Income predicting PM2.5 
+library(broom)
+model <- lm(pm25_1yr_com ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "Income_PM2.5.csv", row.names = FALSE)
+
+
+library(broom)
+model <- lm(PM25DALYY_01_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "Income_PM2.5.csv", row.names = FALSE)
+
+
+
+
+#Income predicting SO2 
+model <- lm(so2_1yr_com ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "Income_SO2.csv", row.names = FALSE)
+
+
+
+model <- lm(SO2OMIYY_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + #other SO2 variable (3 y average)
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "Income_SO2.csv", row.names = FALSE)
+
+
+
+
+
+
+#Income predicting NO2 
+model <- lm(no2_1yr_com ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "Income_NO2.csv", row.names = FALSE)
+
+
+
+#Income predicting ozone
+model <- lm(o3_1yr_com ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "Income_ozone.csv", row.names = FALSE)
+
+
+model <- lm(O3CHGYY_01_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "Income_ozone.csv", row.names = FALSE)
+
+
+```
+
+### 6.2.1 Income predicting condensation  
+```{r}
+
+
+#Income predicting condensation
+model <- lm(ENV_HMPRB_CON_MCQ ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "Income_condensation.csv", row.names = FALSE)
+
+```
+
+
+
+
+
+
+## 6.3 Environmental exposure predicting aging 
+```{r}
+
+#pm2.5
+model <- lm(GrimAge_EAA ~ pm25_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_grimage.csv", row.names = FALSE)
+
+model <- lm(PhenoAge_EAA ~ pm25_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_phenoage.csv", row.names = FALSE)
+
+model <- lm(DunedinPACE ~ pm25_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_Duned.csv", row.names = FALSE)
+
+model <- lm(DNAmIC ~ pm25_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_IC.csv", row.names = FALSE)
+
+
+
+
+#no2_1yr_com
+model <- lm(GrimAge_EAA ~ no2_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_grimage.csv", row.names = FALSE)
+
+model <- lm(PhenoAge_EAA ~ no2_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_phenoage.csv", row.names = FALSE)
+
+model <- lm(DunedinPACE ~ no2_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_Duned.csv", row.names = FALSE)
+
+model <- lm(DNAmIC ~ no2_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_IC.csv", row.names = FALSE)
+
+
+
+
+#so2_1yr_com
+model <- lm(GrimAge_EAA ~ so2_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_grimage.csv", row.names = FALSE)
+
+
+model <- lm(PhenoAge_EAA ~ so2_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_phenoage.csv", row.names = FALSE)
+
+
+model <- lm(DunedinPACE ~ so2_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_Duned.csv", row.names = FALSE)
+
+
+model <- lm(DNAmIC ~ so2_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_IC.csv", row.names = FALSE)
+
+
+
+
+#ozone
+model <- lm(GrimAge_EAA ~ o3_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_grimage.csv", row.names = FALSE)
+
+
+model <- lm(PhenoAge_EAA ~ o3_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_phenoage.csv", row.names = FALSE)
+
+
+model <- lm(DunedinPACE ~ o3_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_Duned.csv", row.names = FALSE)
+
+
+model <- lm(DNAmIC ~ o3_1yr_com + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_IC.csv", row.names = FALSE)
+
+
+
+
+
+#NDVI
+model <- lm(GrimAge_EAA ~ GRLANYY_26_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+model <- lm(PhenoAge_EAA ~ GRLANYY_26_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+model <- lm(DunedinPACE ~ GRLANYY_26_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+model <- lm(DNAmIC ~ GRLANYY_26_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+
+
+
+
+
+#Average of estimated percent of pixel covered by vegetation greater than 5m in height within 100m (2010)
+#grtcc10_02_COM
+
+model <- lm(GrimAge_EAA ~ grtcc10_05_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_treecanopy.csv", row.names = FALSE)
+
+model <- lm(PhenoAge_EAA ~ grtcc10_05_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "PhenoAge_treecanopy.csv", row.names = FALSE)
+
+model <- lm(DunedinPACE ~ grtcc10_05_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "Dune_treecanopy.csv", row.names = FALSE)
+
+model <- lm(DNAmIC ~ grtcc10_05_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "IC_treecanopy.csv", row.names = FALSE)
+
+
+
+
+
+#Max of annual percentages of vegetative greeness within 100 m 
+#GRUMPYY_06_COM
+
+model <- lm(GrimAge_EAA ~ GRUMPYY_09_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_%veg.csv", row.names = FALSE)
+
+model <- lm(PhenoAge_EAA ~ GRUMPYY_09_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "PhenoAge_%veg.csv", row.names = FALSE)
+
+model <- lm(DunedinPACE ~ GRUMPYY_09_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "Dune_%veg.csv", row.names = FALSE)
+
+model <- lm(DNAmIC ~ GRUMPYY_09_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "IC_%vegy.csv", row.names = FALSE)
+
+
+
+
+
+
+
+
+
+
+#Condensation
+model <- lm(GrimAge_EAA ~ ENV_HMPRB_CON_MCQ + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+
+model <- lm(PhenoAge_EAA ~ ENV_HMPRB_CON_MCQ + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+
+model <- lm(DunedinPACE ~ ENV_HMPRB_CON_MCQ + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+
+model <- lm(DNAmIC ~ ENV_HMPRB_CON_MCQ + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "GrimAge_model_results_firstgrp.csv", row.names = FALSE)
+
+
+
+
+```
+
+
+### 6.3.1 Enviro/aging with other air pollution variables 
+
+```{r}
+
+
+PM25DALYY_01_COM
+SO2OMIYY_COM
+O3CHGYY_01_COM
+
+
+#pm2.5
+model <- lm(GrimAge_EAA ~ PM25DALYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_grimage.csv", row.names = FALSE)
+
+model <- lm(PhenoAge_EAA ~ PM25DALYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_phenoage.csv", row.names = FALSE)
+
+model <- lm(DunedinPACE ~ PM25DALYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_Duned.csv", row.names = FALSE)
+
+model <- lm(DNAmIC ~ PM25DALYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_IC.csv", row.names = FALSE)
+
+
+
+
+
+#so2_1yr_com
+model <- lm(GrimAge_EAA ~ SO2OMIYY_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_grimage.csv", row.names = FALSE)
+
+
+model <- lm(PhenoAge_EAA ~ SO2OMIYY_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_phenoage.csv", row.names = FALSE)
+
+
+model <- lm(DunedinPACE ~ SO2OMIYY_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_Duned.csv", row.names = FALSE)
+
+
+model <- lm(DNAmIC ~ SO2OMIYY_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_IC.csv", row.names = FALSE)
+
+
+
+
+#ozone
+model <- lm(GrimAge_EAA ~ O3CHGYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_grimage.csv", row.names = FALSE)
+
+
+model <- lm(PhenoAge_EAA ~ O3CHGYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_phenoage.csv", row.names = FALSE)
+
+
+model <- lm(DunedinPACE ~ O3CHGYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_Duned.csv", row.names = FALSE)
+
+
+model <- lm(DNAmIC ~ O3CHGYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_IC.csv", row.names = FALSE)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1546,7 +2457,7 @@ ggsave("Figures/air_pollution_income_dashboard_PRESENTATION.png",
 
 
 
-
+#9 Imputation 
 
 
 
@@ -2007,4 +2918,49 @@ subset_data %>%
     axis.text.y  = element_text(size = 26)
   )
 
+
+
 ```
+
+
+```{r}
+
+#savings 
+table(subset_data$WEA_SVNGSVL_MCQ, useNA = "ifany") #categories are #1 = Less than $50,000; 2 = $50,000–$99,999; 3 = $100,000–$999,999; 4 = $1 million or more; 8 = Don’t know/No answer; 9 = Refused
+#there are 103 NAs to start with. 
+
+subset_data$WEA_SVNGSVL_MCQ_RECODED <- dplyr::case_when( #reverse code so that 1=4, 2=3, 3=2, 4=1, 5=8,9 
+  subset_data$WEA_SVNGSVL_MCQ == 1 ~ 4,
+  subset_data$WEA_SVNGSVL_MCQ == 2 ~ 3,
+  subset_data$WEA_SVNGSVL_MCQ == 3 ~ 2,
+  subset_data$WEA_SVNGSVL_MCQ == 4 ~ 1,
+  subset_data$WEA_SVNGSVL_MCQ %in% c(8, 9) ~ 5,
+  TRUE ~ NA_real_   
+)
+subset_data$WEA_SVNGSVL_MCQ <- subset_data$WEA_SVNGSVL_MCQ_RECODED
+table(subset_data$WEA_SVNGSVL_MCQ, useNA = "ifany")#103 NAs 
+
+
+#education 
+# Step 1: Coerce to numeric safely (from character/factor labels)
+# Step 2: Set invalid categories to NA (97 = other, 98 = don't know, 99 = refused)
+# Step 3: Reverse code only valid numeric values (1–6)
+# Step 4: Convert to factor
+# Step 5: Optional – drop unused factor levels (e.g., if -90 or others existed)
+# Step 6: Check
+#check NAs
+
+table(subset_data$ED_HIGH_COM)
+subset_data$ED_HIGH_COM <- as.numeric(as.character(subset_data$ED_HIGH_COM))
+subset_data$ED_HIGH_COM[subset_data$ED_HIGH_COM %in% c(97, 98, 99)] <- NA
+subset_data$ED_HIGH_COM <- ifelse(!is.na(subset_data$ED_HIGH_COM), 7 - subset_data$ED_HIGH_COM, NA)
+subset_data$ED_HIGH_COM <- factor(subset_data$ED_HIGH_COM)
+subset_data$ED_HIGH_COM <- droplevels(subset_data$ED_HIGH_COM)
+table(subset_data$ED_HIGH_COM, useNA = "ifany") #231 NAs 
+
+saveRDS(subset_data, file = "subset_data.rds")
+```
+
+
+
+

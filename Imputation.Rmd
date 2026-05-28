@@ -1,0 +1,365 @@
+---
+title: "Imputation"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+date: "2026-05-20"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,       # hides code
+  message = FALSE,    # suppresses messages
+  warning = FALSE     # suppresses warnings
+)
+```
+
+
+
+
+
+set pred
+make sure certain variables don't predict each other 
+think about which variables should be used to predict the others... 
+multi imp=true. make sure it's looking at all of the datasets. 
+do diagnostics after to make sure that the values look stable. bwplot (in keenan's code)
+
+
+#1 create subset of variables 
+Use other script for this 
+
+
+#2 check missingness in each variable within subset 
+
+Notes on province and PM2.5:
+Province 3: 101 missing out of 156 total (~65% missing)
+Province 7: 109 missing out of 309 total (~35% missing)
+
+
+```{r}
+library(mice)
+install.packages("DataExplorer")
+library(DataExplorer)
+plot_missing(subset_data)
+md.pattern(subset_data)
+
+
+colSums(is.na(subset_data)) #how many NAs for each variable 
+
+```
+
+
+#3 what are the types of variables? 
+
+```{r}
+#what class are the variables 
+data.frame(
+  variable = names(subset_data),
+  class = sapply(subset_data, class),
+  n_unique = sapply(subset_data, function(x) length(unique(x))),
+  n_missing = sapply(subset_data, function(x) sum(is.na(x)))
+)
+
+#change categorical variables into factors, not integers 
+subset_data$SEX_ASK_COM <- as.factor(subset_data$SEX_ASK_COM)
+subset_data$WGHTS_PROV_COM <- as.factor(subset_data$WGHTS_PROV_COM)
+subset_data$ENV_HMPRB_CON_MCQ <- as.factor(subset_data$ENV_HMPRB_CON_MCQ)
+subset_data$ALC_FREQ_COM <- as.ordered(subset_data$ALC_FREQ_COM)
+subset_data$ICQ_SMOKE_COM <- as.factor(subset_data$ICQ_SMOKE_COM)
+subset_data$INC_TOT_COM <- as.ordered(subset_data$INC_TOT_COM)
+
+#check that it worked 
+data.frame(
+  variable = names(subset_data),
+  class = sapply(subset_data, function(x) paste(class(x), collapse = ", "))
+)
+
+
+```
+
+
+#4 Initialize MICE and note which variables to not impute. 
+
+```{r}
+# Initialize MICE
+init = mice(subset_data, maxit = 0)
+my_methods = init$method
+pred = make.predictorMatrix(subset_data)
+
+
+# outcomes: don't impute them, but keep as predictors
+pred["GrimAge_EAA", ]  = 0  
+pred["PhenoAge_EAA", ] = 0
+pred["DunedinPACE", ]  = 0
+pred["DNAmIC", ]       = 0
+
+# remove entity_id entirely
+pred[, "entity_id.x"]  = 0
+pred["entity_id.x", ]  = 0
+
+
+# Cell types have no missingness so don't need to be imputed
+# but keep them as predictors (leave their columns as-is)
+pred["CD4nv", ]  = 0
+pred["CD8nv", ]  = 0
+pred["Mono", ]   = 0
+pred["Treg", ]   = 0
+pred["CD4mem", ] = 0
+pred["CD8mem", ] = 0
+pred["NK", ]     = 0
+pred["Bmem", ]   = 0
+pred["Bnv", ]    = 0
+
+
+```
+
+
+# 5 Assign imputation methods for each variable
+
+```{r}
+# Specify imputation methods for each variable
+
+# --- Do NOT impute these ---
+my_methods["entity_id.x"] = "" # dont impute entity_id
+my_methods["GrimAge_EAA"]      = ""   # outcome - do not impute
+my_methods["PhenoAge_EAA"]     = ""   # outcome - do not impute
+my_methods["DunedinPACE"]      = ""   # outcome - do not impute
+my_methods["DNAmIC"]           = ""   # outcome - do not impute
+
+# cell types - no missingness, do not impute
+my_methods["CD4nv"]   = ""
+my_methods["CD8nv"]   = ""
+my_methods["Mono"]    = ""
+my_methods["Treg"]    = ""
+my_methods["CD4mem"]  = ""
+my_methods["CD8mem"]  = ""
+my_methods["NK"]      = ""
+my_methods["Bmem"]    = ""
+my_methods["Bnv"]     = ""
+
+# --- Impute these ---
+my_methods["AGE_NMBR_COM"]      = "pmm"     # continuous
+my_methods["SEX_ASK_COM"]       = "logreg"  # binary
+my_methods["WGHTS_PROV_COM"]    = "pmm"     # categorical >2 levels -> pmm for stability
+my_methods["Race7"]             = "pmm"     # categorical >2 levels -> pmm for stability
+my_methods["INC_TOT_COM"]       = "pmm"     # ordinal categorical -> pmm for stability
+my_methods["ALC_FREQ_COM"]      = "pmm"     # ordinal categorical -> pmm for stability
+my_methods["ICQ_SMOKE_COM"]     = "pmm"     # categorical >2 levels -> pmm for stability
+my_methods["ENV_HMPRB_CON_MCQ"] = "logreg"  # binary
+my_methods["PA2_DSCR2_MCQ"]     = "pmm"     # continuous
+
+# environmental exposures
+my_methods["pm25_1yr_com"]      = "pmm"     # continuous
+my_methods["no2_1yr_com"]       = "pmm"     # continuous
+my_methods["so2_1yr_com"]       = "pmm"     # continuous
+my_methods["o3_1yr_com"]        = "pmm"     # continuous
+my_methods["GRLANYY_26_COM"]    = "pmm"     # continuous (NDVI)
+
+# tree canopy coverage
+my_methods["grtcc10_01_COM"]    = "pmm"     # continuous
+my_methods["grtcc10_02_COM"]    = "pmm"     # continuous
+my_methods["grtcc10_03_COM"]    = "pmm"     # continuous
+my_methods["grtcc10_04_COM"]    = "pmm"     # continuous
+my_methods["grtcc10_05_COM"]    = "pmm"     # continuous
+
+# vegetation coverage
+my_methods["GRUMPYY_01_COM"]    = "pmm"     # continuous
+my_methods["GRUMPYY_02_COM"]    = "pmm"     # continuous
+my_methods["GRUMPYY_03_COM"]    = "pmm"     # continuous
+my_methods["GRUMPYY_04_COM"]    = "pmm"     # continuous
+my_methods["GRUMPYY_05_COM"]    = "pmm"     # continuous
+my_methods["GRUMPYY_06_COM"]    = "pmm"     # continuous
+my_methods["GRUMPYY_07_COM"]    = "pmm"     # continuous
+my_methods["GRUMPYY_08_COM"]    = "pmm"     # continuous
+my_methods["GRUMPYY_09_COM"]    = "pmm"     # continuous
+
+# verify
+my_methods
+```
+
+
+# 6 Run imputation               
+```{r}
+# Run multiple imputation
+imp_data = mice(subset_data,
+                method = my_methods,
+                predictorMatrix = pred,
+                m = 20,
+                seed = 45,
+                printFlag = TRUE)
+
+# Save the imputed data object
+saveRDS(imp_data, file = "imputed_data_CLSA.rds")
+
+# Extract 20 completed datasets into a list
+completed_list = lapply(1:20, function(i) complete(imp_data, action = i))
+
+# Check NAs are gone in the variables we imputed
+colSums(sapply(completed_list[[1]], is.na))
+```
+
+# 7 Run Diagnostic plots to check that the imputation looks reasonable 
+
+```{r}
+colSums(is.na(completed_list[[1]])) #check that there are no more NAs 
+
+plot(imp_data)
+
+stripplot(imp_data)
+
+
+
+
+
+
+#Air pollution
+densityplot(imp_data, ~pm25_1yr_com)
+densityplot(imp_data, ~no2_1yr_com)
+densityplot(imp_data, ~so2_1yr_com) #21% missing - most important to check 
+densityplot(imp_data, ~o3_1yr_com)
+
+# Greenspace
+densityplot(imp_data, ~GRLANYY_26_COM)    # NDVI
+
+# Tree canopy (all 5 buffers)
+densityplot(imp_data, ~grtcc10_01_COM)
+densityplot(imp_data, ~grtcc10_02_COM)
+densityplot(imp_data, ~grtcc10_03_COM)
+densityplot(imp_data, ~grtcc10_04_COM)
+densityplot(imp_data, ~grtcc10_05_COM)
+
+# Vegetation coverage (all 9 buffers)
+densityplot(imp_data, ~GRUMPYY_01_COM)
+densityplot(imp_data, ~GRUMPYY_02_COM)
+densityplot(imp_data, ~GRUMPYY_03_COM)
+densityplot(imp_data, ~GRUMPYY_04_COM)
+densityplot(imp_data, ~GRUMPYY_05_COM)
+densityplot(imp_data, ~GRUMPYY_06_COM)
+densityplot(imp_data, ~GRUMPYY_07_COM)
+densityplot(imp_data, ~GRUMPYY_08_COM)
+densityplot(imp_data, ~GRUMPYY_09_COM)
+
+# Lifestyle/demographic
+densityplot(imp_data, ~PA2_DSCR2_MCQ)
+stripplot(imp_data, ALC_FREQ_COM ~ .imp)
+stripplot(imp_data, ICQ_SMOKE_COM ~ .imp)
+stripplot(imp_data, INC_TOT_COM ~ .imp)
+stripplot(imp_data, ENV_HMPRB_CON_MCQ ~ .imp)
+
+
+
+
+
+
+```
+
+
+# 8 Who is missing data with the air pollution measures? 
+
+528 people out of 1478 (36%) would be dropped if I did complete case on all pollution variables. That is too many cases to drop. 
+
+PM2.5
+Province 3: 65% missing — MICE only has 55 observed values to learn the PM2.5 distribution for that province
+Province 7: 35% missing — MICE has 200 observed values but 109 are missing
+
+NO2:
+The people missing NO2 are different people than those missing PM2.5.
+Province 6: 58 missing out of 152 (~38% missing)
+Province 9: 153 missing out of 295 (~52% missing)
+
+```{r}
+# look at characteristics of people missing vs not missing pm25
+subset_data %>%
+  mutate(missing_pm25 = is.na(pm25_1yr_com)) %>%
+  group_by(missing_pm25) %>%
+  summarise(
+    n = n(),
+    mean_age = mean(AGE_NMBR_COM, na.rm = TRUE),
+    mean_income = mean(as.numeric(INC_TOT_COM), na.rm = TRUE))
+
+
+
+subset_data %>%
+  mutate(missing_pm25 = is.na(pm25_1yr_com)) %>%
+  group_by(missing_pm25) %>%
+  summarise(
+    n = n(),
+    mean_age = mean(AGE_NMBR_COM, na.rm = TRUE),
+    mean_income = mean(as.numeric(INC_TOT_COM), na.rm = TRUE),
+    pct_male = mean(SEX_ASK_COM == 1, na.rm = TRUE),  # adjust coding if needed
+    mean_pm25 = mean(pm25_1yr_com, na.rm = TRUE),
+    pct_race_white = mean(Race7 == 1, na.rm = TRUE))  # adjust coding if needed
+
+
+#check which PM2.5 are missing (by province)
+subset_data %>%
+  mutate(missing_pm25 = is.na(pm25_1yr_com)) %>%
+  group_by(WGHTS_PROV_COM, missing_pm25) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = missing_pm25, values_from = n)
+
+
+
+#check which NO2 are missing (by province) - they are different than the PM2.5
+subset_data %>%
+  mutate(missing_pm25 = is.na(so2_1yr_com)) %>%
+  group_by(WGHTS_PROV_COM, missing_pm25) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = missing_pm25, values_from = n)
+
+
+#check how many total missing across all the air pollution variables (528!)
+subset_data %>%
+  mutate(missing_any = is.na(pm25_1yr_com) | is.na(no2_1yr_com) | 
+           is.na(so2_1yr_com) | is.na(o3_1yr_com)) %>%
+  count(missing_any)
+
+
+
+#check if tree canopy coverage has the same provincial missingness pattern:
+#province 5 has no tree canopy data! (112 missing) 
+subset_data %>%
+  mutate(missing_pm25 = is.na(grtcc10_01_COM)) %>%
+  group_by(WGHTS_PROV_COM, missing_pm25) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = missing_pm25, values_from = n)
+
+#check if %veg has same provincial missingness - no, it doesn't. it's pretty spread out. 
+subset_data %>%
+  mutate(missing_pm25 = is.na(GRUMPYY_04_COM)) %>%
+  group_by(WGHTS_PROV_COM, missing_pm25) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = missing_pm25, values_from = n)
+
+
+#check if condensation has same provincial missingness - no, it doesn't. it's pretty spread out. 
+subset_data %>%
+  mutate(missing_pm25 = is.na(ENV_HMPRB_CON_MCQ)) %>%
+  group_by(WGHTS_PROV_COM, missing_pm25) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = missing_pm25, values_from = n)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

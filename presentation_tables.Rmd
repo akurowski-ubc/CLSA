@@ -1,0 +1,277 @@
+---
+title: "Visualizations"
+output: word_document
+date: "2026-04-10"
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(flextable)
+library(officer)
+library(dplyr)
+```
+
+# Environmental predicting aging  
+
+```{r enviro_aging}
+
+data <- tibble(
+  exposure = c(
+    "NDVI", "NDVI",
+    "TCC\u1d43", "TCC\u1d47", "TCC\u1d9c",
+    "Condensation", "Condensation", "Condensation", "Condensation",
+    "SO\u2082 (1-year)", "SO\u2082 (1-year)", "SO\u2082 (1-year)"
+  ),
+  measure = c(
+    "GrimAge EAA", "DNAm Intrinsic Capacity",
+    "DNAm Intrinsic Capacity", "GrimAge EAA", "DunedinPACE",
+    "GrimAge EAA", "PhenoAge EAA", "DunedinPACE", "DNAm Intrinsic Capacity",
+    "GrimAge EAA", "PhenoAge EAA", "DNAm Intrinsic Capacity"
+  ),
+  beta = c(-5.709, 0.021, 1.990, -0.030, -0.0009,
+           1.548, 1.280, 0.025, -0.004,
+           0.361, 0.608, -0.001),
+  p = c(0.030, 0.037, 0.050, 0.090, 0.080,
+        0.002, 0.050, 0.050, 0.037,
+        0.029, 0.008, 0.043)
+) |>
+  mutate(
+    exposure = case_when(
+      exposure != lag(exposure, default = "") ~ exposure,
+      TRUE ~ ""
+    ),
+    p = ifelse(p < 0.05,
+               paste0(format(round(p, 3), nsmall = 3), "*"),
+               format(round(p, 3), nsmall = 3)),
+    beta = format(round(beta, 4), nsmall = 3)
+  )
+
+flextable(data) |>
+  set_header_labels(
+    exposure = "Exposure",
+    measure  = "Aging measure",
+    beta     = "\u03b2",
+    p        = "p"
+  ) |>
+  add_header_lines("Environmental Exposures Predicting Aging") |>
+  bold(part = "header") |>
+  bold(i = ~ exposure != "", j = "exposure") |>
+  hline(i = which(data$exposure != "")[-1] - 1,
+        border = fp_border_default(width = 0.5, color = "#aaaaaa")) |>
+  hline_top(border = fp_border_default(width = 1.5)) |>
+  hline_bottom(border = fp_border_default(width = 1.5)) |>
+  align(j = c("beta", "p"), align = "right", part = "all") |>
+  align(j = c("exposure", "measure"), align = "left", part = "all") |>
+  width(j = "exposure", width = 1.5) |>
+  width(j = "measure",  width = 2.2) |>
+  width(j = "beta",     width = 0.8) |>
+  width(j = "p",        width = 0.8) |>
+  fontsize(size = 10, part = "all") |>
+  font(fontname = "Times New Roman", part = "all") |>
+  add_footer_lines(c(
+    "* p < .05",
+    "TCC\u1d43: % of pixel covered by vegetation >5m",
+    "TCC\u1d47: Mean estimated % within 100m",
+    "TCC\u1d9c: Mean estimated % within 1km"
+  )) |>
+  fontsize(size = 8, part = "footer") |>
+  set_table_properties(layout = "autofit")
+```
+
+
+\newpage
+
+
+# Income predicting TCC 
+
+```{r income_tcc}
+data_income_tcc <- tibble(
+  income_group = c("100k-150k", "50k-100k", "20k-50k", "<20k", "DN/NA/R"),
+  beta = c(-1.781, -2.273, -2.631, -1.983, -3.076),
+  p = c(0.002, 0.001, 0.001, 0.012, 0.001)
+) |>
+  mutate(
+    p = case_when(
+      p < 0.001 ~ "<0.001*",
+      p < 0.05  ~ paste0(format(round(p, 3), nsmall = 3), "*"),
+      TRUE      ~ format(round(p, 3), nsmall = 3)
+    ),
+    beta = format(round(beta, 3), nsmall = 3)
+  )
+
+flextable(data_income_tcc) |>
+  set_header_labels(
+    income_group = "Income group",
+    beta         = "\u03b2",
+    p            = "p"
+  ) |>
+  add_header_lines("Income Predicting Tree Canopy Coverage (TCC)") |>
+  bold(part = "header") |>
+  hline_top(border = fp_border_default(width = 1.5)) |>
+  hline_bottom(border = fp_border_default(width = 1.5)) |>
+  align(j = c("beta", "p"), align = "right", part = "all") |>
+  align(j = "income_group", align = "left", part = "all") |>
+  width(j = "income_group", width = 1.5) |>
+  width(j = "beta",         width = 0.8) |>
+  width(j = "p",            width = 0.8) |>
+  fontsize(size = 10, part = "all") |>
+  font(fontname = "Times New Roman", part = "all") |>
+  add_footer_lines(c(
+    "Tree canopy coverage: Mean of estimated % of pixel covered by vegetation >5m, within 100m",
+    "* p < .05 · DN/NA/R = Did not answer / Not applicable / Refused to answer"
+  )) |>
+  fontsize(size = 8, part = "footer") |>
+  set_table_properties(layout = "autofit")
+```
+
+
+\newpage
+
+# Income predicting condensation
+
+```{r}
+data_income_condensation <- tibble(
+  income_group = c("100k-150k", "50k-100k", "20k-50k", "<20k", "DN/NA/R"),
+  beta = c(0.013, 0.026, 0.047, 0.103, 0.030),
+  p = c(0.460, 0.113, 0.008, 0.0001, 0.249)
+) |>
+  mutate(
+    p = case_when(
+      p < 0.001 ~ "<0.001*",
+      p < 0.05  ~ paste0(format(round(p, 3), nsmall = 3), "*"),
+      TRUE      ~ format(round(p, 3), nsmall = 3)
+    ),
+    beta = format(round(beta, 3), nsmall = 3)
+  )
+
+flextable(data_income_condensation) |>
+  set_header_labels(
+    income_group = "Income group",
+    beta         = "\u03b2",
+    p            = "p"
+  ) |>
+  add_header_lines("Income Predicting Problems with Condensation") |>
+  bold(part = "header") |>
+  hline_top(border = fp_border_default(width = 1.5)) |>
+  hline_bottom(border = fp_border_default(width = 1.5)) |>
+  align(j = c("beta", "p"), align = "right", part = "all") |>
+  align(j = "income_group", align = "left", part = "all") |>
+  width(j = "income_group", width = 1.5) |>
+  width(j = "beta",         width = 0.8) |>
+  width(j = "p",            width = 0.8) |>
+  fontsize(size = 10, part = "all") |>
+  font(fontname = "Times New Roman", part = "all") |>
+  add_footer_lines(c(
+    "* p < .05 · DN/NA/R = Did not answer / Not applicable / Refused to answer"
+  )) |>
+  fontsize(size = 8, part = "footer") |>
+  set_table_properties(layout = "autofit")
+```
+
+
+\newpage
+
+# income predicting pollution
+
+```{r}
+data_income_airpollution <- tibble(
+  income_group  = c("100k-150k", "50k-100k", "20k-50k", "<20k", "DN/NA/R"),
+  beta_pm25     = c(0.064,  0.160, 0.006, -0.136, 0.259),
+  p_pm25        = c(0.365,  0.016, 0.939,  0.173, 0.016),
+  beta_so2      = c(-0.087, 0.040, 0.131,  0.112, 0.167),
+  p_so2         = c(0.168,  0.490, 0.037,  0.215, 0.074),
+  beta_no2      = c(-0.222, 0.019, 0.118, -0.070, 0.445),
+  p_no2         = c(0.163,  0.898, 0.459,  0.761, 0.051),
+  beta_ozone    = c(0.088, -0.162, 0.222,  0.790, -0.178),
+  p_ozone       = c(0.660,  0.376, 0.261,  0.004,  0.540)
+) |>
+  mutate(across(starts_with("beta"), ~ format(round(.x, 3), nsmall = 3))) |>
+  mutate(across(starts_with("p"), ~ case_when(
+    .x < 0.001 ~ "<0.001*",
+    .x < 0.05  ~ paste0(format(round(.x, 3), nsmall = 3), "*"),
+    .x < 0.10  ~ paste0(format(round(.x, 3), nsmall = 3), " \u2020"),
+    TRUE        ~ format(round(.x, 3), nsmall = 3)
+  )))
+
+flextable(data_income_airpollution) |>
+  set_header_labels(
+    income_group = "Income group",
+    beta_pm25    = "\u03b2", p_pm25    = "p",
+    beta_so2     = "\u03b2", p_so2     = "p",
+    beta_no2     = "\u03b2", p_no2     = "p",
+    beta_ozone   = "\u03b2", p_ozone   = "p"
+  ) |>
+ add_header_row(
+    values     = c("", "PM2.5", "SO\u2082", "NO\u2082", "OZONE"),
+    colwidths  = c(1, 2, 2, 2, 2)
+  ) |>
+  add_header_lines("Income Predicting Air Pollution") |>
+  bold(part = "header") |>
+  hline_top(border = fp_border_default(width = 1.5)) |>
+  hline_bottom(border = fp_border_default(width = 1.5)) |>
+  vline(j = c(2, 4, 6), 
+        border = fp_border_default(width = 0.5, color = "#aaaaaa"),
+        part = "body") |>
+  align(j = c("beta_pm25","p_pm25","beta_so2","p_so2",
+               "beta_no2","p_no2","beta_ozone","p_ozone"),
+        align = "right", part = "all") |>
+  align(j = "income_group", align = "left", part = "all") |>
+  align(i = 2, align = "center", part = "header") |>
+  width(j = "income_group", width = 1.2) |>
+  width(j = c("beta_pm25","p_pm25","beta_so2","p_so2",
+               "beta_no2","p_no2","beta_ozone","p_ozone"), width = 0.7) |>
+  fontsize(size = 10, part = "all") |>
+  font(fontname = "Times New Roman", part = "all") |>
+  add_footer_lines(
+    "* p < .05 · \u2020 p < .10 (borderline significant) · DN/NA/R = Did not answer / Not applicable / Refused to answer"
+  ) |>
+  fontsize(size = 8, part = "footer") |>
+  set_table_properties(layout = "autofit")
+```
+
+\newpage
+
+#income predicting aging (GrimAge) 
+
+```{r}
+data_income_grimage <- tibble(
+  income_group = c("100k-149k", "50k-99k", "20k-49k", "<20k", "DN/NA/R"),
+  beta = c(1.037, 1.011, 2.488, 3.747, 1.616),
+  p = c(0.004, 0.003, 0.0001, 0.0001, 0.014)
+) |>
+  mutate(
+    p = case_when(
+      p < 0.001 ~ "<0.001*",
+      p < 0.05  ~ paste0(format(round(p, 3), nsmall = 3), "*"),
+      TRUE      ~ format(round(p, 3), nsmall = 3)
+    ),
+    beta = format(round(beta, 3), nsmall = 3)
+  )
+
+flextable(data_income_grimage) |>
+  set_header_labels(
+    income_group = "Income group",
+    beta         = "\u03b2",
+    p            = "p"
+  ) |>
+  add_header_lines("Income Predicting GrimAge (45-64 years old)") |>
+  bold(part = "header") |>
+  hline_top(border = fp_border_default(width = 1.5)) |>
+  hline_bottom(border = fp_border_default(width = 1.5)) |>
+  align(j = c("beta", "p"), align = "right", part = "all") |>
+  align(j = "income_group", align = "left", part = "all") |>
+  width(j = "income_group", width = 1.5) |>
+  width(j = "beta",         width = 0.8) |>
+  width(j = "p",            width = 0.8) |>
+  fontsize(size = 10, part = "all") |>
+  font(fontname = "Times New Roman", part = "all") |>
+  add_footer_lines(
+    "Reference group: >150k · * p < .05 · DN/NA/R = Did not answer / Not applicable / Refused to answer"
+  ) |>
+  fontsize(size = 8, part = "footer") |>
+  set_table_properties(layout = "autofit")
+```
+
+

@@ -1,0 +1,67 @@
+---
+title: "Socioeconomic determinants and biological aging: Exploring the potential mediating role of environmental exposures in the Canadian Longitudinal Study on Aging"
+output:
+  word_document:
+    reference_docx: style_reference.docx
+bibliography: References/references.bib
+csl: References/nature.csl
+---
+
+```{r, echo = FALSE, warning = FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  dpi = 300
+)
+```
+
+
+**Study design**
+
+Data were drawn from the Canadian Longitudinal Study on Aging (CLSA), a national, long-term cohort study that follows Canadian adults to understand biological, medical, psychological, social, and economic aspects of aging [@rainaCohortProfileCanadian2019]. Participants were eligible if they were aged 45–85 years at enrolment and residing in one of the 10 Canadian provinces. The CLSA is composed of two cohorts: a Tracking cohort of 21,241 participants interviewed by telephone, and a Comprehensive cohort of 30,097 participants who were both interviewed in-home, and had physical examinations and biological specimens collected at 11 data collection sites. Baseline data collection began in 2011 and ended in 2017, and follow up data collection has been occurring every 3 years. 
+
+At baseline, all participants completed questionnaire-based assessments covering sociodemographic, lifestyle, and health-related information. Comprehensive cohort participants additionally underwent physical measurements and provided blood and urine samples at one of eleven data collection sites located across seven provinces. 
+
+**Study population**
+
+The current analysis focuses on a subset of Comprehensive cohort participants selected for genome-wide DNA methylation (DNAm) profiling. Of the 30,097 participants in the Comprehensive cohort at baseline, 23,492 had provided blood samples with available EDTA whole blood and buffy coat. From this group, 10,000 participants were selected for genomics and metabolomics analyses, of whom 1,500 were subsequently selected for epigenetic profiling. DNAm was successfully assayed in 1,478 of these participants using the Illumina Infinium MethylationEPIC BeadChip microarray, which provides quantitative measurements of DNA methylation across 865,918 total genomic sites. All sample selections were made to reflect the distribution of the Comprehensive cohort by age, sex, and data collection site. 
+
+**Measures**
+
+*Biological Aging Outcomes*
+
+Four DNA methylation-based epigenetic clocks/measures were used as outcome measures, each trained to capture distinct aspects of biological aging.
+PhenoAge was trained on a composite of nine clinical biomarkers and chronological age, and predicts phenotypic age and mortality risk [@levineEpigeneticBiomarkerAging2018].
+GrimAge was trained to predict seven plasma proteins and smoking pack-years, and is a strong predictor of time-to-death and disease risk [@luDNAMethylationGrimAge2019].
+DunedinPACE ] was trained on 19 biomarkers measured across four time points over 20 years to capture the rate of biological decline, providing a measure of the pace of aging rather than a biological age estimate [@belskyDunedinPACEDNAMethylation2022.
+DNAm Intrinsic Capacity is a novel measure that was trained to predict an intrinsic capacity score based on five factors: cognition, locomotion, psychology, sensory ability, and vitality. This measure  predicts functional decline and mortality [@fuentealbaBloodbasedEpigeneticClock2025a].
+
+
+*Socioeconomic Conditions*
+
+Total household income was used as an indicator of socioeconomic conditions. Participants were asked to report their best estimate of total household income received by all household members, from all sources, before taxes and deductions, in the past 12 months. Income was categorized into five groups: less than $20,000; $20,000 to less than $50,000; $50,000 to less than $100,000; $100,000 to less than $150,000; and $150,000 or more. Participants who responded "don't know," refused to respond, or provided no answer were retained in the analysis and classified as separate categories.
+
+
+*Environmental Exposures*
+
+Environmental exposures included air pollution, tree canopy cover (TCC), and housing condensation. Air pollution and TCC measures were linked to CLSA data through the Canadian Urban Environmental Health Research Consortium (CANUE) [@shephs5@mcmaster.caCLSALinksCANUE2018].
+
+Annual average PM2.5 concentration in micrograms per cubic meter (ug/m3) was measured from the V5.GL.03 dataset (1998–2021), which combines Aerosol Optical Depth retrievals from NASA's MODIS, MISR, and SeaWiFS instruments with the GEOS-Chem chemical transport model and calibrates estimates to ground-based observations using Geographically Weighted Regression. Values are linked to annual postal code files to enable spatial analysis [@canueDataPortal].
+
+Annual average ozone (O3), measured in parts per billion (ppb), was a one year average of ground-level observations, modeled by  Environment and Climate Change Canada using CHRONOS Canadian Hemispherical Regional Ozone and NOx System model from 2002–2009, and Global Environmental Multi-scale Modelling Air Quality and Chemistry (GEM-MACH) model from 2010 to 2024. These values are also linked to postal code [@canueDataPortal]. 
+
+Three year annual average SO2 concentration, measured in ppb, was derived from  Ozone Monitoring Instrument (OMI) satellite data combined with GEM-MACH model profiles, covering 2007–2015, where each value represents the average of the labelled year and the two preceding years. These values are also linked to postal code [@canueDataPortal]. 
+
+No postal code-level NO2 measure was available for the baseline data collection period. The only available measure within the CLSA data is no2_1yr_com, which represents a one-year average derived from NAPS stations within 50 km. This provides limited spatial variation in urban areas where monitoring stations are densely clustered.
+
+TCC refers to the percentage of area covered by woody plants taller than 5 metres. Estimates were derived from Landsat satellite imagery (30m resolution) via Google Earth Engine for 2010 and 2015, and averaged within buffers of 100, 250, 500, and 1000 metres around each postal code [@canueDataPortal].
+
+Condensation problems were assessed via a single yes/no questionnaire item: "Does your current home have problems with condensation?" 
+
+
+
+\newpage
+
+
+# References
+
+
