@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 
 \newpage
 
-# Description of Study and Sample 
+# 1 Description of Study and Sample 
 
 ## CLSA and CANUE data  
 
@@ -35,17 +35,18 @@ DNAm PhenoAge was calculated following the method described by Levine et al. (re
 
 Epigenetic age acceleration (EAA) for DNAm PhenoAge was then calculated using a linear regression of DNAm PhenoAge (dependent variable) on chronological age (independent variable). The residuals from this regression represent EAA: a positive residual means an individual’s epigenetic age is higher than expected for their chronological age (faster aging), while a negative residual means it is lower than expected (slower aging). Because the regression is done within this specific study group, EAA values show how an individual’s aging compares to others in the same cohort.
 
-# Descriptive Statistics
+# 2 Descriptive Statistics
 
-## Missing data (environmental)
 
-```{r table_missingdata, echo=FALSE, fig.width=8,fig.height=5,out.width="100%"}
-knitr::include_graphics("Tables/Table_missing.png")
+## Missing data 
+
+```{r table_missing, echo=FALSE, out.width="80%"}
+knitr::include_graphics("Figures/missing_table.png")
 ```
 
-## Missing data (environmental)
-** everything else 
-
+```{r figure_missing, echo=FALSE, fig.width=14, fig.height=9, out.width="100%", fig.cap="Figure X: Missing data pattern across study variables"}
+knitr::include_graphics("Figures/missing_plot.png")
+```
 
 
 ## Demographics: Age, sex, and ethnicity 
@@ -93,14 +94,18 @@ knitr::include_graphics("Figures/savings_barplot.png")
 The following plots show the differences between linked data from CANUE vs. annual averages of NAPs locations. 
 
 PM2.5 (Fine Particulate Matter)
-pm25_1yr_com is the one-year average PM2.5 concentration (µg/m³) prior to each participant's first interview date, calculated
-as averages of National Air Pollution Surveillance station (NAPS) locations within 50 km. PM25DALYY_01_COM is a postal code-level annual average derived from the V5.GL.03 satellite dataset (1998–2021), which combines Aerosol Optical Depth retrievals from NASA's MODIS, MISR, and SeaWiFS instruments with the GEOS-Chem chemical transport model, calibrated to ground observations via Geographically Weighted Regression. The key differences are that pm25_1yr_com is anchored to each participant's interview date and station-based, while PM25DALYY_01_COM is a modelled, fixed annual postal code estimate. 
+pm25_1yr_com is the one-year average PM2.5 concentration (µg/m³) prior to each participant's first interview date, calculated as averages of National Air Pollution Surveillance station (NAPS) locations within 50 km. PM25DALYY_01_COM is a postal code-level annual average derived from the V5.GL.03 satellite dataset (1998–2021), which combines Aerosol Optical Depth retrievals from NASA's MODIS, MISR, and SeaWiFS instruments with the GEOS-Chem chemical transport model, calibrated to ground observations via Geographically Weighted Regression. The key differences are that pm25_1yr_com is anchored to each participant's interview date and station-based, while PM25DALYY_01_COM is a modelled, fixed annual postal code estimate. 
 
 Ozone (O3)
 o3_1yr_com is the one-year average ozone concentration prior to each participant's first interview date, calculated from NAPS stations within 50 km. O3CHGYY_01_COM is a postal code-level annual average modelled by  Environment and Climate Change Canada using CHRONOS Canadian Hemispherical Regional Ozone and NOx System model from 2002–2009, and Global Environmental Multi-scale Modelling Air Quality and Chemistry (GEM-MACH) model from 2010 to 2024. These estimates  incorporate ground-level observations, and reported only where data completeness thresholds are met. The key differences are that o3_1yr_com is anchored to each participant's interview date and station-based, while O3CHGYY_01_COM is a modelled, fixed annual postal code estimate. 
 
 SO2 (Sulfur Dioxide)
-so2_1yr_com is the one-year average SO2 concentration prior to each participant's first interview date, calculated from NAPS stations within 50 km. SO2OMIYY_COM is a postal code-level three-year running average (ppb) derived from  Ozone Monitoring Instrument (OMI) satellite data combined with GEM-MACH model profiles, covering 2007–2015, where each value represents the average of the labelled year and the two preceding years. The key differences are that so2_1yr_com is anchored to each participant's interview date and station-based, while SO2OMIYY_COM is a satellite- and model-derived fixed estimate smoothed over three years.
+so2_1yr_com is the one-year average SO2 concentration prior to each participant's first interview date, calculated from NAPS stations within 50 km. SO2OMIYY_COM is a postal code-level three-year running average (ppb) derived from  Ozone Monitoring Instrument (OMI) satellite data combined with GEM-MACH model profiles, covering 2007–2015, where each value represents the average of the labelled year and the two preceding years. The key differences are that so2_1yr_com is anchored to each participant's interview date and station-based, while SO2OMIYY_COM is a satellite- and model-derived fixed estimate smoothed over three years. 
+
+
+NO2 (Nitrogen Dioxide) 
+no2_1yr_com is the one-year average NO2 concentration prior to each participant's first interview date, calculated from NAPS stations within 50 km. There was no linked CANUE NO2 data matching the baseline collection years, so for nitrogen dioxide, will use the average measure calculated from NAPS stations within 50 km. 
+
 
 
 ```{r figure_pm25_density, echo=FALSE, fig.width=5, fig.height=4, out.width="80%", fig.cap="Figure X: Distribution comparison of PM25DALYY_01_COM vs pm25_1yr_com."}
@@ -190,7 +195,8 @@ knitr::include_graphics("Figures/tree_canopy_dashboard.png")
 
 ### Vegetative greenness fractions
 
-Vegetative greenness fractions: Users can interpret values as the percentage of green vegetation within each 30 m by 30 m pixel, but vegetative greenness fraction values are an indication of both the area coverage and intensity (i.e., strength of spectral signal) of all green vegetation within a 30 m by 30 m pixel. For instance, built environment factors (e.g. housing, asphalt) as well as tree canopy are accounted for in analysis, and therefore the presence of roads and buildings underneath canopy can yield lower greenness values. Water pixels were masked out using the Statistics Canada 2016 census water boundary files. CANUE staff assigned values to postal codes (1984-2016) as annual metrics and by calculating the mean and maximum of pixel level greenness within buffers of 100, 250, 500, and 1000 m. Source:[CANUE metadata](https://www.canuedata.ca/metadata.php)
+Vegetative greenness fraction measures the proportion of green vegetation visible within each 30 m satellite pixel, derived from Landsat imagery spanning 1984–2016. Because the measure captures everything within a pixel, the presence of roads, buildings, and other built structures can reduce greenness values even in areas with tree cover, making it a broader indicator of urban vegetation rather than canopy alone. Annual mean and maximum values were assigned to postal codes within buffers of 100, 250, 500, and 1000 metres around each postal code centroid [@canueDataPortal].
+
 
 
 ```{r table_percentveggreenness, echo=FALSE, fig.width=8, fig.height=5, out.width="100%"}
@@ -238,7 +244,7 @@ knitr::include_graphics("Figures/ndvi_500m_histogram.png")
 \newpage
 
 
-# Environmental variables by income 
+# 3 Environmental by income 
 
 ## Air pollution measures by Income 
 
@@ -341,8 +347,33 @@ knitr::include_graphics("Figures/NDVI_by_income_group.png")
 
 
 
+# Linear regressions 
+## Income predicting aging 
 
-#To do: 
+```{r table_income, echo=FALSE, out.width="100%", fig.cap="Table X: Association between household income and epigenetic aging, stratified by age group"}
+knitr::include_graphics("Figures/income_epigenetic_table.png")
+```
+
+<br>
+<br>
+
+Note: Reference category: $150,000+. Results are beta coefficients and 95% CI from linear regression models adjusted for sex, age, age-squared, province, ethnicity, and cell type composition. Bold indicates p < 0.05. GrimAge EAA = GrimAge epigenetic age acceleration; PhenoAge EAA = PhenoAge epigenetic age acceleration; DunedinPACE = pace of biological aging; DNAmIC = DNA methylation immune age.
+
+
+
+
+
+
+
+
+
+
+
+\newpage
+
+
+
+# To do: 
 
 outcome variable descriptive stats 
 

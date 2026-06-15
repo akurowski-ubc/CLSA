@@ -17,9 +17,6 @@ knitr::opts_chunk$set(
 ```
 
 
-
-
-
 set pred
 make sure certain variables don't predict each other 
 think about which variables should be used to predict the others... 
