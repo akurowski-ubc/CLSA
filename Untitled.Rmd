@@ -1,0 +1,178 @@
+---
+title: "mini"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+date: "2026-04-10"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,       # hides code
+  message = FALSE,    # suppresses messages
+  warning = FALSE     # suppresses warnings
+)
+```
+
+
+```{r}
+
+#demographics
+table_demographics <- df_table %>%
+  select(AGE_NMBR_COM, SEX_ASK_COM, WGHTS_PROV_COM, Race7) %>%
+  tbl_summary(
+    label = list(
+      AGE_NMBR_COM ~ "Age (years)",
+      SEX_ASK_COM ~ "Sex",
+      WGHTS_PROV_COM ~ "Province",
+      Race7 ~ "Self-reported ethnicity"
+    ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    missing = "no"
+  ) %>%
+  as_flex_table()
+
+save_as_image(table_demographics, path = "Figures/demographics.png", res = 300)
+
+
+
+#income and wealth 
+table_SES <- df_table %>%
+  select(INC_TOT_COM, WEA_SVNGSVL_MCQ) %>%
+  tbl_summary(
+    label = list(
+      INC_TOT_COM ~ "Household income",
+      WEA_SVNGSVL_MCQ ~ "Household savings"
+    ),
+    statistic = list(all_categorical() ~ "{n} ({p}%)"),
+    missing = "no"
+  ) %>%
+  as_flex_table()
+
+save_as_image(table_SES, path = "Figures/SES.png", res = 300)
+
+
+#aging outcomes:
+table_aging <- df_table %>%
+  select(GrimAge_EAA, PhenoAge_EAA, DunedinPACE, DNAmIC) %>%
+  tbl_summary(
+    label = list(
+      GrimAge_EAA ~ "GrimAge EAA",
+      PhenoAge_EAA ~ "PhenoAge EAA",
+      DunedinPACE ~ "DunedinPACE",
+      DNAmIC ~ "DNAmIC"
+    ),
+    statistic = list(all_continuous() ~ "{mean} ({sd})"),
+    missing = "no"
+  ) %>%
+  as_flex_table()
+
+save_as_image(table_aging, path = "Figures/aging_outcomes.png", res = 300)
+
+
+
+#air pollution 
+table_pollution <- df_table %>%
+  select(PM25DALYY_01_COM, O3CHGYY_01_COM, no2_1yr_com, so2_1yr_com, GRLANYY_26_COM, ENV_HMPRB_CON_MCQ) %>%
+  tbl_summary(
+    label = list(
+      PM25DALYY_01_COM ~ "PM2.5, 1-year average (µg/m³)",
+      O3CHGYY_01_COM ~ "Ozone, 1-year average (ppb)",
+      no2_1yr_com ~ "NO₂, 1-year average (µg/m³)",
+      so2_1yr_com ~ "SO₂, 1-year average (ppb)",
+      GRLANYY_26_COM ~ "NDVI",
+      ENV_HMPRB_CON_MCQ ~ "Housing condensation"
+    ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    missing = "no"
+  ) %>%
+  as_flex_table()
+
+save_as_image(table_pollution, path = "Figures/pollution.png", res = 300)
+
+#TCC and %vegetative greenness 
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+library(gtsummary)
+library(knitr)
+library(kableExtra)
+
+table1 <- df_table %>%
+  select(AGE_NMBR_COM, SEX_ASK_COM, WGHTS_PROV_COM, Race7,
+         INC_TOT_COM, WEA_SVNGSVL_MCQ) %>%
+  tbl_summary(
+    label = list(
+      AGE_NMBR_COM ~ "Age (years)",
+      SEX_ASK_COM ~ "Sex",
+      WGHTS_PROV_COM ~ "Province",
+      Race7 ~ "Self-reported ethnicity",
+      INC_TOT_COM ~ "Household income",
+      WEA_SVNGSVL_MCQ ~ "Household savings"
+    ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    missing = "no"
+  ) %>%
+  as_flex_table()
+
+table1
+
+save_as_image(table1, path = "Figures/demographics_SES.png", res = 300)
+
+```
+
+
+
+
+
+
+
+
+
+
+```{r}
+library(officer)
+
+doc <- read_docx("Figures/demographics_SES.docx")
+```
+
