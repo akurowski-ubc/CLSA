@@ -1,0 +1,2931 @@
+---
+title: "Visualizations"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+date: "2026-04-10"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,       # hides code
+  message = FALSE,    # suppresses messages
+  warning = FALSE     # suppresses warnings
+)
+```
+
+# 1. Load and clean data 
+
+```{r}
+
+#load data 
+
+load("data/CLSA_methylation.rds")
+
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(flextable)
+library (haven)
+library(table1)
+library(stargazer)
+library(htmltools)
+
+library(table1)
+library(Hmisc)
+library(htmltools)
+library(webshot2)
+library(tidyverse)
+
+
+#not going to include these: 
+#"ED_HIGH_COM", "WEA_SVNGSVL_MCQ","temp_1yr_com" LGTNLTYY_01_COM "ENV_HMPRB_NOI_MCQ","pm25_5yrs_com",   "PM25DALYY_02_COM", "no2_5yrs_com", 
+ # "Locrds_length_200m_com",   "Phwy_length_200m_com", 
+
+#create subset 
+subset_data <- CLSA_methylation[, c(
+  "entity_id.x", 
+  
+ #demographics
+  "AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7",
+  
+  ##############
+ #Socioeconomic variables
+ ##############
+ 
+  "INC_TOT_COM", 
+  
+ 
+  ##############
+ #Aging outcome variables
+ ##############
+ 
+  # aging outcomes
+  "GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC",
+  
+ 
+ ##############
+ #Environmental variables
+ ##############
+ 
+  #pollution 
+   "PM25DALYY_01_COM",  "O3CHGYY_01_COM", "no2_1yr_com", "so2_1yr_com",
+ 
+ #condensation 
+ "ENV_HMPRB_CON_MCQ",
+ 
+ #NDVI
+ "GRLANYY_26_COM", 
+  
+  ##Tree canopy and %veg 
+  "grtcc10_01_COM",  "grtcc10_04_COM", #tree canopy coverage 
+  
+  "GRUMPYY_01_COM",    "GRUMPYY_04_COM", #%vegetative greenness 
+  
+  
+  # Lifestyle / behavioral
+  "PA2_DSCR2_MCQ", "ALC_FREQ_COM", "ICQ_SMOKE_COM", #PASE scale: PASE Score - Final (in sharepoint dictionary)
+  
+  #cell types
+  "CD4nv", "CD8nv",   "Mono", "Treg", "CD4mem", "CD8mem", "NK", "Bmem", "Bnv"
+)]
+
+
+#check structure of variables 
+str(subset_data)
+
+
+
+
+
+```
+
+
+## Recode missing values to N/A
+
+```{r}
+# Recode NAs
+subset_data$no2_1yr_com[subset_data$no2_1yr_com %in% c(-8888, -9999)] <- NA
+subset_data$so2_1yr_com[subset_data$so2_1yr_com %in% c(-8888, -9999)] <- NA
+subset_data$GRLANYY_26_COM[subset_data$GRLANYY_26_COM %in% c(-8888, -9999)] <- NA
+subset_data$ENV_HMPRB_CON_MCQ[subset_data$ENV_HMPRB_CON_MCQ %in% c(-8888, -9999)] <- NA
+subset_data$PM25DALYY_01_COM[subset_data$PM25DALYY_01_COM %in% c(-8888, -9999)] <- NA
+subset_data$O3CHGYY_01_COM[subset_data$O3CHGYY_01_COM %in% c(-8888, -9999)] <- NA
+subset_data$grtcc10_01_COM[subset_data$grtcc10_01_COM %in% c(-8888, -9999)] <- NA
+subset_data$grtcc10_04_COM[subset_data$grtcc10_04_COM %in% c(-8888, -9999)] <- NA
+subset_data$GRUMPYY_01_COM[subset_data$GRUMPYY_01_COM %in% c(-8888, -9999)] <- NA
+subset_data$GRUMPYY_04_COM[subset_data$GRUMPYY_04_COM %in% c(-8888, -9999)] <- NA
+
+subset_data$PA2_DSCR2_MCQ[subset_data$PA2_DSCR2_MCQ %in% c(-888)] <- NA
+subset_data$ICQ_SMOKE_COM[subset_data$ICQ_SMOKE_COM %in% c(-8)] <- NA
+subset_data$ALC_FREQ_COM[subset_data$ALC_FREQ_COM %in% c(77, 98, 99)] <- NA
+
+
+colSums(is.na(subset_data))#check number of NAs
+
+```
+
+
+
+
+## Factor and label variables
+
+```{r}
+library(gtsummary)
+library(dplyr)
+library(flextable)
+
+# ============= Recode, Factor, and Label Variables =============
+
+# Sex
+subset_data <- subset_data %>%
+  mutate(SEX_ASK_COM = factor(SEX_ASK_COM,
+                              levels = c("M", "F"),
+                              labels = c("Male", "Female")))
+
+# Province
+subset_data <- subset_data %>%
+  mutate(WGHTS_PROV_COM = factor(WGHTS_PROV_COM,
+                                 levels = 1:10,
+                                 labels = c("Alberta", "British Columbia", "Manitoba",
+                                            "New Brunswick", "Newfoundland and Labrador",
+                                            "Nova Scotia", "Ontario", "Prince Edward Island",
+                                            "Quebec", "Saskatchewan")))
+
+# Race/Ethnicity
+subset_data <- subset_data %>%
+  mutate(Race7 = factor(Race7,
+                        levels = c("White", "South Asian", "Black", "Asian",
+                                   "Arab", "Latin American", "Other")))
+
+# Household Income — reverse code so 1=highest, 5=lowest
+# Original: 1=<20K, 2=20-50K, 3=50-100K, 4=100-150K, 5=150K+, 8/9=Don't know/Refused
+cat("=== Income BEFORE reverse coding ===\n")
+table(subset_data$INC_TOT_COM, useNA = "ifany")
+
+subset_data <- subset_data %>%
+  mutate(
+    INC_TOT_COM = factor(
+      case_when(
+        INC_TOT_COM == 1 ~ 5,
+        INC_TOT_COM == 2 ~ 4,
+        INC_TOT_COM == 3 ~ 3,
+        INC_TOT_COM == 4 ~ 2,
+        INC_TOT_COM == 5 ~ 1,
+        INC_TOT_COM %in% c(8, 9) ~ 6,
+        TRUE ~ NA_real_
+      ),
+      levels = c(1, 2, 3, 4, 5, 6),
+      labels = c("150K+", "100K–150K", "50K–100K", "20K–50K", "<20K",
+                 "Don't know/No answer/Refused")
+    )
+  )
+
+cat("=== Income AFTER reverse coding ===\n")
+table(subset_data$INC_TOT_COM, useNA = "ifany")
+
+# Housing condensation
+subset_data <- subset_data %>%
+  mutate(ENV_HMPRB_CON_MCQ = factor(ENV_HMPRB_CON_MCQ,
+                                    levels = c(0, 1),
+                                    labels = c("No", "Yes")))
+
+# Alcohol
+subset_data$ALC_FREQ_COM[subset_data$ALC_FREQ_COM %in% c(-8888, -9999, 77, 98, 99)] <- NA
+subset_data <- subset_data %>%
+  mutate(
+    ALC_FREQ_COM = factor(
+      ALC_FREQ_COM,
+      levels = c(96, 7, 6, 5, 4, 3, 2, 1),
+      labels = c("Never",
+                 "Less than once a month",
+                 "About once a month",
+                 "2-3 times a month",
+                 "Once a week",
+                 "2-3 times a week",
+                 "4-5 times a week",
+                 "Almost every day (incl. 6 times a week)"),
+      ordered = TRUE)
+  )
+table(subset_data$ALC_FREQ_COM)
+
+# Smoking
+subset_data$ICQ_SMOKE_COM[subset_data$ICQ_SMOKE_COM %in% c(-8888, -9999)] <- NA
+subset_data <- subset_data %>%
+  mutate(ICQ_SMOKE_COM = factor(ICQ_SMOKE_COM,
+                                levels = c(1, 2, 3),
+                                labels = c("Current smoker",
+                                           "Never smoker",
+                                           "Former smoker")))
+table(subset_data$ICQ_SMOKE_COM)
+
+# ============= Variable Labels =============
+var_labels <- list(
+  AGE_NMBR_COM      ~ "Age (years)",
+  SEX_ASK_COM       ~ "Sex",
+  WGHTS_PROV_COM    ~ "Province",
+  Race7             ~ "Self-reported ethnicity",
+  INC_TOT_COM       ~ "Household income",
+  GrimAge_EAA       ~ "GrimAge EAA",
+  PhenoAge_EAA      ~ "PhenoAge EAA",
+  DunedinPACE       ~ "DunedinPACE",
+  DNAmIC            ~ "DNAmIC",
+  PM25DALYY_01_COM  ~ "PM2.5, 1-year average (µg/m³)",
+  no2_1yr_com       ~ "NO₂, 1-year average (µg/m³)",
+  so2_1yr_com       ~ "SO₂, 1-year average (µg/m³)",
+  O3CHGYY_01_COM    ~ "Ozone, 1-year average (µg/m³)",
+  GRLANYY_26_COM    ~ "NDVI",
+  ENV_HMPRB_CON_MCQ ~ "Housing condensation",
+  grtcc10_01_COM    ~ "Tree canopy cover (2010)",
+  grtcc10_04_COM    ~ "Tree canopy cover, mean within 500m (2010)",
+  GRUMPYY_01_COM    ~ "Vegetative greenness, annual % (postal code)",
+  GRUMPYY_04_COM    ~ "Vegetative greenness, mean within 500m",
+  ICQ_SMOKE_COM     ~ "Smoking",
+  ALC_FREQ_COM      ~ "Alcohol use",
+  PA2_DSCR2_MCQ     ~ "PASE scale score final"
+)
+```
+
+
+
+
+
+
+
+
+
+
+## Missingness 
+
+```{r}
+#install.packages("DataExplorer")
+library(DataExplorer)
+library(mice)
+library(ggplot2)
+plot_missing(subset_data)
+md.pattern(subset_data)
+
+
+colSums(is.na(subset_data)) #how many NAs for each variable 
+
+p <- plot_missing(subset_data)
+ggsave("Figures/missing_plot.png", plot = p, width = 12, height = 7, dpi = 600)
+
+
+
+missing_table <- data.frame(
+  Variable = c(
+    "AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7",
+    "INC_TOT_COM", "WEA_SVNGSVL_MCQ",
+    "GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC",
+    "grtcc10_01_COM", "grtcc10_04_COM",
+    "GRUMPYY_01_COM", "GRUMPYY_04_COM",
+    "GRLANYY_26_COM", "ENV_HMPRB_CON_MCQ",
+    "PM25DALYY_01_COM", "O3CHGYY_01_COM", "SO2OMIYY_COM",
+    "CD4nv", "CD8nv", "Mono", "Treg", "CD4mem", "CD8mem", "NK", "Bmem", "Bnv"
+  ),
+  Description = c(
+    "Age", "Sex", "Province", "Self-reported ethnicity",
+    "Household income", "Household savings",
+    "GrimAge", "PhenoAge", "DunedinPACE", "DNAmIC",
+    "Tree canopy cover at postal code (2010)",
+    "Tree canopy cover within 500m (2010)",
+    "Vegetative greenness at postal code (annual %)",
+    "Vegetative greenness within 500m (mean annual %)",
+    "NDVI (vegetative greenness, 500m buffer)", "Housing condensation",
+    "PM2.5 concentration (ug/m³, annual avg)", "Ozone (ppb, annual avg)", "SO2 concentration (ppb, 3-yr avg)",
+    "Naïve CD4+ T cells", "Naïve CD8+ T cells", "Monocytes", "Regulatory T cells",
+    "Memory CD4+ T cells", "Memory CD8+ T cells", "Natural Killer cells", "Memory B cells", "Naïve B cells"
+  )
+)
+
+vars <- missing_table$Variable
+missing_table$N_Missing <- sapply(vars, function(v) sum(is.na(subset_data[[v]])))
+missing_table$Pct_Missing <- round(missing_table$N_Missing / nrow(subset_data) * 100, 1)
+
+knitr::kable(missing_table,
+             col.names = c("Variable", "Description", "N Missing", "% Missing"),
+             caption = "Table X: Missing data by variable")
+
+
+library(kableExtra)
+
+missing_table_formatted <- knitr::kable(missing_table,
+               col.names = c("Variable", "Description", "N Missing", "% Missing"),
+               caption = "Table X: Missing data by variable",
+               format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+
+save_kable(missing_table_formatted, "Figures/missing_table.png", zoom = 2)
+
+```
+
+
+
+
+## Interaction btw age and income 
+
+```{r}
+
+#check structure 
+str(subset_data$AGE_NMBR_COM)
+str(subset_data$INC_TOT_COM)
+
+model <- aov(AGE_NMBR_COM ~ INC_TOT_COM, data = subset_data)
+summary(model)
+
+```
+
+
+
+#2. Descriptive stats
+
+## Table 1
+
+```{r}
+table1 <- subset_data %>%
+  mutate(INC_TOT_COM = recode(INC_TOT_COM,
+    "Don't know/No answer/Refused" = "DK/NA/R"
+  )) %>%
+  select(
+    # Demographics
+    AGE_NMBR_COM, SEX_ASK_COM, WGHTS_PROV_COM, Race7,
+    # Income
+    INC_TOT_COM,
+    # Air pollution and housing
+    PM25DALYY_01_COM, O3CHGYY_01_COM, no2_1yr_com, so2_1yr_com, 
+    GRLANYY_26_COM, ENV_HMPRB_CON_MCQ,
+    # Tree canopy cover
+    grtcc10_01_COM, grtcc10_04_COM,
+    # Vegetative greenness
+    GRUMPYY_01_COM, GRUMPYY_04_COM
+  ) %>%
+  tbl_summary(
+    by = INC_TOT_COM,
+    label = list(
+      AGE_NMBR_COM ~ "Age (years)",
+      SEX_ASK_COM ~ "Sex",
+      WGHTS_PROV_COM ~ "Province",
+      Race7 ~ "Self-reported ethnicity",
+      PM25DALYY_01_COM ~ "PM2.5, 1-year average (µg/m³)",
+      O3CHGYY_01_COM ~ "Ozone, 1-year average (ppb)",
+      no2_1yr_com ~ "NO₂, 1-year average (ppb)",
+      so2_1yr_com ~ "SO₂, 1-year average (ppb)",
+      GRLANYY_26_COM ~ "NDVI",
+      ENV_HMPRB_CON_MCQ ~ "Housing condensation",
+      grtcc10_01_COM ~ "TCC at postal code",
+      grtcc10_04_COM ~ "TCC mean within 500m",
+      GRUMPYY_01_COM ~ "VGF at postal code",
+      GRUMPYY_04_COM ~ "VGF mean within 500m"
+    ),
+    type = list(
+      SEX_ASK_COM ~ "categorical",
+      Race7 ~ "categorical",
+      ENV_HMPRB_CON_MCQ ~ "categorical"
+    ),
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    missing = "no"
+  ) %>%
+  add_overall(last = TRUE, col_label = "**Total** (n = {N})") %>%
+  modify_header(all_stat_cols() ~ "**{level}** (n = {n})") %>%
+  add_n(
+    statistic = "{N_miss} ({p_miss}%)",
+    col_label = "**Missing**"
+  ) %>%
+  modify_spanning_header(all_stat_cols() ~ "**Household Income**") %>%
+ modify_footnote(all_stat_cols() ~ NA) %>%
+  as_flex_table() %>%
+  add_footer_lines("TCC: percent tree canopy cover of woody vegetation taller than 5 metres. VGF: vegetative greenness fraction, capturing all green vegetation regardless of height and vegetation density. NDVI: Normalized Difference Vegetation Index. DK/NA/R: Don't know, no answer, refused")
+
+save_as_image(table1, path = "Figures/table1.png", res = 300)
+
+```
+
+
+# 3.0 Linear Regressions
+## INCOME PREDICTING AGING (stratified by age)
+
+
+```{r}
+
+# recode income as numeric, highest to lowest
+subset_data$income_trend <- as.numeric(factor(subset_data$INC_TOT_COM,
+  levels = c("150K+", "100-150k", "50-100K", "20-50K", "<20K"),
+  ordered = TRUE))
+
+# stratify by age group
+subset_data$age_group <- ifelse(subset_data$AGE_NMBR_COM < 65, "45-64", "65-85")
+subset_data_firstgrp  <- subset_data[subset_data$age_group == "45-64", ]
+subset_data_secondgrp <- subset_data[subset_data$age_group == "65-85", ]
+
+library(broom)
+
+dir.create("regression_csvs", showWarnings = FALSE)
+
+# function to run model and extract scaled results
+run_trend_model <- function(outcome, data_45, data_65, steps = 4) {
+  
+  formula <- as.formula(paste0(outcome, " ~ income_trend + SEX_ASK_COM + AGE_NMBR_COM + I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7 + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv"))
+  
+  # 45-64
+  model_45   <- lm(formula, data = data_45)
+  results_45 <- tidy(model_45, conf.int = TRUE, conf.level = 0.95)
+  write.csv(results_45, file.path("regression_csvs", paste0(outcome, "_trend_results_45to64.csv")), row.names = FALSE)
+  
+  # 65-85
+  model_65   <- lm(formula, data = data_65)
+  results_65 <- tidy(model_65, conf.int = TRUE, conf.level = 0.95)
+  write.csv(results_65, file.path("regression_csvs", paste0(outcome, "_trend_results_65to85.csv")), row.names = FALSE)
+  
+  # scale results
+  get_scaled <- function(results, age_grp) {
+    beta <- results$estimate[results$term == "income_trend"]
+    se   <- results$std.error[results$term == "income_trend"]
+    p    <- results$p.value[results$term == "income_trend"]
+    data.frame(
+      outcome   = outcome,
+      age_group = age_grp,
+      estimate  = beta * steps,
+      conf.low  = (beta - 1.96 * se) * steps,
+      conf.high = (beta + 1.96 * se) * steps,
+      p.value   = p
+    )
+  }
+  
+  bind_rows(
+    get_scaled(results_45, "45-64"),
+    get_scaled(results_65, "65-85")
+  )
+}
+
+# run for all outcomes
+all_scaled <- bind_rows(
+  run_trend_model("GrimAge_EAA",  subset_data_firstgrp, subset_data_secondgrp),
+  run_trend_model("PhenoAge_EAA", subset_data_firstgrp, subset_data_secondgrp),
+  run_trend_model("DunedinPACE",  subset_data_firstgrp, subset_data_secondgrp),
+  run_trend_model("DNAmIC",       subset_data_firstgrp, subset_data_secondgrp)
+)
+
+print(all_scaled)
+write.csv(all_scaled, file.path("regression_csvs", "all_trend_scaled_results.csv"), row.names = FALSE)
+
+# format the scaled results into a nice table
+table_trend <- all_scaled %>%
+  mutate(
+    sig_stars = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE            ~ ""
+    ),
+    Result = ifelse(
+      outcome == "DNAmIC",
+      paste0(formatC(estimate, format = "e", digits = 2),
+             " (", formatC(conf.low, format = "e", digits = 2),
+             ", ", formatC(conf.high, format = "e", digits = 2), ")", sig_stars),
+      paste0(round(estimate, 2),
+             " (", round(conf.low, 2),
+             ", ", round(conf.high, 2), ")", sig_stars)
+    )
+  ) %>%
+  select(age_group, outcome, Result) %>%
+  pivot_wider(names_from = outcome, values_from = Result)
+
+table_45 <- table_trend %>% filter(age_group == "45-64") %>% select(-age_group)
+table_65 <- table_trend %>% filter(age_group == "65-85") %>% select(-age_group)
+
+table_final_trend <- bind_rows(table_45, table_65)
+
+save_kable(
+  knitr::kable(table_final_trend,
+               col.names = c("GrimAge EAA", "PhenoAge EAA", "DunedinPACE", "DNAmIC"),
+               caption = "Table X: Association between household income (highest to lowest, per one-step increase) and epigenetic aging, stratified by age group",
+               escape = FALSE) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+    pack_rows("45-64 years", 1, nrow(table_45)) %>%
+    pack_rows("65-85 years", nrow(table_45) + 1, nrow(table_final_trend)) %>%
+    footnote(general = "Estimates represent the difference in epigenetic age acceleration associated with moving from highest (150K+) to lowest (<20K) income (4 steps). * p < 0.05, ** p < 0.01, *** p < 0.001. Models adjusted for sex, age, age², province, ethnicity, and blood cell type proportions.Note: DNAmIC measures intrinsic capacity, where higher values indicate better health; therefore, a negative coefficient indicates that lower income is associated with reduced intrinsic capacity, consistent with accelerated aging."),
+  "Figures/income_trend_table.png", zoom = 2
+)
+
+```
+
+
+
+
+
+
+
+## INCOME PREDICTING ENVIRONMENT 
+
+```{r}
+
+# recode income as numeric, highest to lowest
+subset_data$income_trend <- as.numeric(factor(subset_data$INC_TOT_COM,
+  levels = c("150K+", "100-150k", "50-100K", "20-50K", "<20K"),
+  ordered = TRUE))
+
+# function for continuous environmental outcomes
+run_env_model <- function(outcome, data) {
+  
+  formula <- as.formula(paste0(outcome, " ~ income_trend + SEX_ASK_COM + AGE_NMBR_COM + I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7"))
+  
+  model   <- lm(formula, data = data)
+  results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+  write.csv(results, paste0("regression_csvs/", outcome, "_env_results.csv"), row.names = FALSE)
+  
+  beta <- results$estimate[results$term == "income_trend"]
+  se   <- results$std.error[results$term == "income_trend"]
+  p    <- results$p.value[results$term == "income_trend"]
+  
+  data.frame(
+    outcome   = outcome,
+    estimate  = beta * 4,
+    conf.low  = (beta - 1.96 * se) * 4,
+    conf.high = (beta + 1.96 * se) * 4,
+    p.value   = p
+  )
+}
+
+# run above fxn for all continuous environmental outcomes
+all_env_results <- bind_rows(
+  run_env_model("PM25DALYY_01_COM", subset_data),
+  run_env_model("O3CHGYY_01_COM",   subset_data),
+  run_env_model("no2_1yr_com",      subset_data),
+  run_env_model("so2_1yr_com",      subset_data),
+  run_env_model("GRLANYY_26_COM",   subset_data),
+  run_env_model("grtcc10_01_COM",   subset_data),
+  run_env_model("grtcc10_04_COM",   subset_data),
+  run_env_model("GRUMPYY_01_COM",   subset_data),
+  run_env_model("GRUMPYY_04_COM",   subset_data)
+)
+
+print(all_env_results)
+write.csv(all_env_results, "regression_csvs/all_env_results.csv", row.names = FALSE)
+
+# ---- logistic regression for housing condensation ----
+formula_cond <- ENV_HMPRB_CON_MCQ ~ income_trend + SEX_ASK_COM + AGE_NMBR_COM + 
+                I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+
+model_cond   <- glm(formula_cond, data = subset_data, family = binomial())
+results_cond <- tidy(model_cond, conf.int = TRUE, conf.level = 0.95)
+write.csv(results_cond, "regression_csvs/ENV_HMPRB_CON_MCQ_env_results.csv", row.names = FALSE)
+
+beta_cond <- results_cond$estimate[results_cond$term == "income_trend"]
+se_cond   <- results_cond$std.error[results_cond$term == "income_trend"]
+p_cond    <- results_cond$p.value[results_cond$term == "income_trend"]
+steps <- 4
+
+condensation_result <- data.frame(
+  outcome   = "ENV_HMPRB_CON_MCQ",
+  OR        = exp(beta_cond * steps),
+  conf.low  = exp((beta_cond - 1.96 * se_cond) * steps),
+  conf.high = exp((beta_cond + 1.96 * se_cond) * steps),
+  p.value   = p_cond
+)
+
+print(condensation_result)
+write.csv(condensation_result, "regression_csvs/condensation_result.csv", row.names = FALSE)
+
+# make into a nice table 
+env_table <- all_env_results %>%
+  mutate(
+    sig_stars = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE            ~ ""
+    ),
+    Result = paste0(round(estimate, 3),
+                    " (", round(conf.low, 3),
+                    ", ", round(conf.high, 3), ")", sig_stars),
+    outcome = recode(outcome,
+      "PM25DALYY_01_COM" = "PM2.5, 1-year average (µg/m³)",
+      "O3CHGYY_01_COM"   = "Ozone, 1-year average (ppb)",
+      "no2_1yr_com"      = "NO₂, 1-year average (ppb)",
+      "so2_1yr_com"      = "SO₂, 1-year average (ppb)",
+      "GRLANYY_26_COM"   = "Max 500m",
+      "grtcc10_01_COM"   = "Tree canopy coverage % at postal code",
+      "grtcc10_04_COM"   = "Tree canopy coverage % mean within 500m",
+      "GRUMPYY_01_COM"   = "Vegetative greenness fraction at postal code",
+      "GRUMPYY_04_COM"   = "Vegetative greenness fraction mean within 500m"
+    )
+  ) %>%
+  select(outcome, Result)
+
+# format condensation result (OR)
+condensation_row <- condensation_result %>%
+  mutate(
+    sig_stars = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE            ~ ""
+    ),
+    outcome = "Yes vs No",
+    Result  = paste0(round(OR, 2),
+                     " (", round(conf.low, 2),
+                     ", ", round(conf.high, 2), ")", sig_stars, " [OR]")
+  ) %>%
+  select(outcome, Result)
+
+# combine into one table
+env_table_final <- bind_rows(
+  env_table[1:4, ],
+  condensation_row,
+  env_table[5, ],
+  env_table[6:9, ]
+)
+save_kable(
+  knitr::kable(env_table_final,
+               col.names = c("Environmental Variable", "β (95% CI)"),
+               caption = "Table X: Association between household income and environmental exposures (highest to lowest income, 4-step trend)",
+               escape = FALSE) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+    pack_rows("Air Pollution", 1, 4) %>%
+    pack_rows("Housing Condensation", 5, 5) %>%
+    pack_rows("Normalized Difference Vegetation Index", 6, 6) %>%
+    pack_rows("Tree Canopy Cover", 7, 8) %>%
+    pack_rows("Vegetative Greenness", 9, 10) %>%
+    footnote(general = "Estimates represent the difference in environmental exposure associated with moving from highest (150K+) to lowest (<20K) income (4 steps). * p < 0.05, ** p < 0.01, *** p < 0.001. Models adjusted for sex, age, age², province, and ethnicity. [OR] = odds ratio from logistic regression."),
+  "Figures/env_income_table.png", zoom = 2
+)
+
+```
+
+
+
+
+
+
+
+
+## ENVIRONMENT PREDICTING AGING
+
+```{r}
+library(broom)
+library(tidyr)
+library(dplyr)
+library(kableExtra)
+
+# ── Shared setup ──────────────────────────────────────────────────────────────
+
+covariates <- "SEX_ASK_COM + AGE_NMBR_COM + I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7 +
+               CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv"
+
+outcomes <- c(
+  GrimAge     = "GrimAge_EAA",
+  PhenoAge    = "PhenoAge_EAA",
+  DunedinPACE = "DunedinPACE",
+  DNAmIC      = "DNAmIC"
+)
+
+run_model <- function(outcome_var, predictor, filepath) {
+  model <- lm(as.formula(paste(outcome_var, "~", predictor, "+", covariates)),
+              data = subset_data)
+  write.csv(tidy(model, conf.int = TRUE, conf.level = 0.95), filepath, row.names = FALSE)
+}
+
+# ── Air pollution ─────────────────────────────────────────────────────────────
+
+air_preds <- c(
+  PM2.5 = "PM25DALYY_01_COM",
+  Ozone = "O3CHGYY_01_COM",
+  NO2   = "no2_1yr_com",
+  SO2   = "so2_1yr_com"
+)
+
+for (env in names(air_preds)) {
+  for (out in names(outcomes)) {
+    run_model(outcomes[out], air_preds[env],
+              paste0("regression_csvs/Air_", env, "_", out, ".csv"))
+  }
+}
+
+# ── TCC ───────────────────────────────────────────────────────────────────────
+
+tcc_preds <- setNames(c("grtcc10_01_COM", "grtcc10_04_COM"),
+                      c("PostalCode", "500m"))
+
+for (env in names(tcc_preds)) {
+  for (out in names(outcomes)) {
+    run_model(outcomes[out], tcc_preds[env],
+              paste0("regression_csvs/TCC_", env, "_", out, ".csv"))
+  }
+}
+
+# ── Vegetative Greenness ──────────────────────────────────────────────────────
+
+green_preds <- setNames(c("GRUMPYY_01_COM", "GRUMPYY_04_COM"),
+                        c("PostalCode", "Mean500m"))
+
+for (env in names(green_preds)) {
+  for (out in names(outcomes)) {
+    run_model(outcomes[out], green_preds[env],
+              paste0("regression_csvs/greenness_", env, "_", out, ".csv"))
+  }
+}
+
+# ── Condensation ──────────────────────────────────────────────────────────────
+
+for (out in names(outcomes)) {
+  run_model(outcomes[out], "ENV_HMPRB_CON_MCQ",
+            paste0("regression_csvs/Condensation_", out, ".csv"))
+}
+
+# ── NDVI ──────────────────────────────────────────────────────────────────────
+
+for (out in names(outcomes)) {
+  run_model(outcomes[out], "GRLANYY_26_COM",
+            paste0("regression_csvs/NDVI_", out, ".csv"))
+}
+
+# ── Shared table stuff ────────────────────────────────────────────────────────
+
+read_model <- function(file, env, outcome) {
+  read.csv(file) %>% mutate(Env = env, Outcome = outcome)
+}
+
+aging_cols <- c("Exposure", "GrimAge EAA", "PhenoAge EAA", "DunedinPACE", "DNAmIC")
+
+load_results <- function(prefix, envs, env_labels) {
+  bind_rows(lapply(seq_along(envs), function(i) {
+    bind_rows(lapply(names(outcomes), function(out) {
+      read_model(paste0("regression_csvs/", prefix, envs[i], "_", out, ".csv"),
+                 env_labels[i], out)
+    }))
+  }))
+}
+
+# ── Load all results ──────────────────────────────────────────────────────────
+
+air_envs   <- c("PM2.5", "Ozone", "NO2", "SO2")
+air_labels <- c("PM2.5, 1-year average (µg/m³)",
+                "Ozone, 1-year average (ppb)",
+                "NO₂, 1-year average (ppb)",
+                "SO₂, 1-year average (ppb)")
+air_terms  <- c("PM25DALYY_01_COM", "O3CHGYY_01_COM", "no2_1yr_com", "so2_1yr_com")
+air_results <- load_results("Air_", air_envs, air_labels)
+
+tcc_file_labels <- c("PostalCode", "500m")
+tcc_env_labels  <- c("Tree canopy coverage, % at postal code",
+                     "Tree canopy coverage, % mean within 500m")
+tcc_terms       <- c("grtcc10_01_COM", "grtcc10_04_COM")
+tcc_results     <- load_results("TCC_", tcc_file_labels, tcc_env_labels)
+
+green_file_labels <- c("PostalCode", "Mean500m")
+green_env_labels  <- c("Vegetative greenness fraction at postal code",
+                       "Vegetative greenness fraction, mean within 500m")
+green_terms       <- c("GRUMPYY_01_COM", "GRUMPYY_04_COM")
+green_results     <- load_results("greenness_", green_file_labels, green_env_labels)
+
+cond_results <- bind_rows(lapply(names(outcomes), function(out) {
+  read_model(paste0("regression_csvs/Condensation_", out, ".csv"), "Yes vs No", out)
+}))
+
+ndvi_results <- bind_rows(lapply(names(outcomes), function(out) {
+  read_model(paste0("regression_csvs/NDVI_", out, ".csv"), "Max NDVI within 500m", out)
+}))
+
+# ── Combine and format ────────────────────────────────────────────────────────
+
+all_env_aging <- bind_rows(
+  air_results   %>% filter(term %in% air_terms),
+  cond_results  %>% filter(term == "ENV_HMPRB_CON_MCQYes"),
+  ndvi_results  %>% filter(term == "GRLANYY_26_COM"),
+  tcc_results   %>% filter(term %in% tcc_terms),
+  green_results %>% filter(term %in% green_terms)
+) %>%
+  mutate(
+    sig_stars = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      TRUE            ~ ""
+    ),
+    Result = ifelse(
+      Outcome == "DNAmIC",
+      paste0(formatC(estimate, format = "e", digits = 2),
+             " (", formatC(conf.low, format = "e", digits = 2),
+             ", ", formatC(conf.high, format = "e", digits = 2), ")", sig_stars),
+      ifelse(
+        abs(estimate) < 0.01,
+        paste0(round(estimate, 4), " (", round(conf.low, 4), ", ", round(conf.high, 4), ")", sig_stars),
+        paste0(round(estimate, 2), " (", round(conf.low, 2), ", ", round(conf.high, 2), ")", sig_stars)
+      )
+    )
+  ) %>%
+  select(Env, Outcome, Result) %>%
+  pivot_wider(names_from = Outcome, values_from = Result)
+
+# row counts for pack_rows
+n_air   <- length(air_envs)
+n_cond  <- 1
+n_ndvi  <- 1
+n_tcc   <- length(tcc_env_labels)
+n_green <- length(green_env_labels)
+
+save_kable(
+  knitr::kable(all_env_aging,
+               col.names = aging_cols,
+               caption = "Table X: Association between environmental exposures and epigenetic aging",
+               escape = FALSE) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+    pack_rows("Air Pollution", 1, n_air) %>%
+    pack_rows("Housing Condensation", n_air + 1, n_air + n_cond) %>%
+    pack_rows("Normalized Difference Vegetation Index", n_air + n_cond + 1, n_air + n_cond + n_ndvi) %>%
+    pack_rows("Tree Canopy Cover", n_air + n_cond + n_ndvi + 1, n_air + n_cond + n_ndvi + n_tcc) %>%
+    pack_rows("Vegetative Greenness", n_air + n_cond + n_ndvi + n_tcc + 1, n_air + n_cond + n_ndvi + n_tcc + n_green) %>%
+    footnote(general = "* p < 0.05, ** p < 0.01, *** p < 0.001. Models adjusted for sex, age, age², province, ethnicity, and blood cell type proportions."),
+  "Figures/env_aging_table.png", zoom = 2
+)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 4.0 Plots
+
+
+General Code needed for plots 
+
+```{r}
+#Custom theme for all figures
+
+report_theme <- theme_classic(base_size = 11) +
+  theme(
+    legend.position = "none",
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face  = "bold",
+      size  = 13,
+      margin = margin(b = 8)
+    ),
+    
+    axis.title.x = element_text(
+      face = "bold",
+      size = 11,
+      margin = margin(t = 6)
+    ),
+    axis.title.y = element_text(
+      face = "bold",
+      size = 11,
+      margin = margin(r = 6)
+    ),
+    
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10)
+  )
+
+```
+
+
+### demographics
+
+```{r}
+
+subset_data <- readRDS("subset_data.rds")
+
+# age and sex  ------------------------------------------------------
+
+#pie chart for sex
+df_sex <- subset_data %>%
+  filter(!is.na(SEX_ASK_COM)) %>%
+  count(SEX_ASK_COM) %>%
+  mutate(
+    percent = n / sum(n),
+    label = paste0(SEX_ASK_COM, " (", round(percent * 100, 1), "%)")
+  )
+
+ggplot(df_sex, aes(x = 1, y = n, fill = SEX_ASK_COM)) +
+  geom_col(width = 1, color = "white", linewidth = 1) +
+  coord_polar(theta = "y") +
+  geom_text(
+    aes(label = label),
+    position = position_stack(vjust = 0.5),
+    size = 10,              # big, slide-friendly
+    fontface = "plain"
+  ) +
+  scale_fill_manual(values = c("F" = "#1f77b4", "M" = "#ff7f0e")) +
+  labs(title = "Sex Distribution", x = NULL, y = NULL, fill = NULL) +
+  theme_void() +
+  theme(
+    # remove any remaining axis/radial artifacts
+    axis.line = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face  = "bold",
+      size  = 38,
+      margin = margin(b = 18)
+    ),
+    
+    legend.position = "right",
+    legend.text = element_text(size = 26),
+    legend.key.size = grid::unit(1.2, "lines")
+  )
+
+
+#age boxplot 
+subset_data %>%
+  filter(!is.na(AGE_NMBR_COM)) %>%
+  ggplot(aes(x = "", y = AGE_NMBR_COM)) +
+  geom_boxplot(
+    width = 0.25,
+    fill = "white",
+    color = "#2C7FB8",
+    linewidth = 1.2
+  ) +
+  scale_y_continuous(
+    breaks = seq(
+      floor(min(subset_data$AGE_NMBR_COM, na.rm = TRUE) / 5) * 5,
+      ceiling(max(subset_data$AGE_NMBR_COM, na.rm = TRUE) / 5) * 5,
+      by = 5
+    )
+  ) +
+  labs(
+    title = "Age Distribution",
+    x = NULL,
+    y = "Age (years)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(
+      hjust  = 0.5,
+      face   = "bold",
+      size   = 38,
+      margin = margin(b = 18)
+    ),
+    axis.title.y = element_text(
+      face   = "bold",
+      size   = 30,
+      margin = margin(r = 16)
+    ),
+    axis.title.x = element_blank(),
+    axis.text.y  = element_text(size = 26),
+    axis.text.x  = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_line(linetype = "dotted"),
+    panel.grid.major.y = element_line(linetype = "dashed"),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background  = element_rect(fill = "white", color = NA)
+  )
+
+
+ggsave("age_distribution.png", width = 12, height = 7, dpi = 600)
+
+# categories of cultural background:"White", "South Asian", "Black", "Asian","Arab", "Latin American", "Other"
+subset_data %>%
+  count(Race7) %>%
+  mutate(
+    percent = round(100 * n / sum(n), 1)
+  )
+
+  
+```
+
+
+```{r}
+
+# ethnicity/self reported background barplot 
+p_ethnicity <- subset_data %>%
+  filter(!is.na(Race7)) %>%
+  count(Race7, name = "n") %>%
+  arrange(n) %>%
+  ggplot(aes(x = n, y = Race7)) +
+  geom_col(fill = "#2C7FB8", width = 0.7) +
+  labs(
+    title = "Self-Reported Cultural Background",
+    x = "Number of Participants",
+    y = NULL
+  ) +
+  report_theme
+
+ggsave("Figures/ethnicity_barplot.png", plot = p_ethnicity, width = 5, height = 4, dpi = 300)
+```
+
+
+
+
+
+### Socioeconomic variables: Household Income and Wealth 
+
+```{r}
+
+#summary table of household income
+#after reversing: 1 = $150,000 or more ; 2 = $100,000–$149,999 ; 3 = $50,000–$99,999; 4 = $20,000–$49,999; 5 = Less than $20,000; 6=  Don't know/No answer/Refused
+
+subset_data %>%
+  count(INC_TOT_COM) %>%
+  mutate(
+    percent = round(100 * n / sum(n), 1)
+  )
+
+
+# household income barplot 
+p_income <- subset_data %>%
+  count(income_cat, name = "n") %>%
+  ggplot(aes(x = n, y = income_cat)) +
+  geom_col(fill = "#2C7FB8", width = 0.7) +
+  labs(
+    title = "Household Income (Past 12 Months)",
+    x = "Number of Participants",
+    y = NULL
+  ) +
+  report_theme
+
+ggsave("Figures/household_income_barplot.png", plot = p_income, width = 5, height = 4, dpi = 300)
+
+
+
+
+#savings categories after reverse code are: 1=1 million or more. 2=100k to 1 million. 3=50-100k. 4=<50K. 5=don't know/no answer/refused 
+subset_data %>%
+  count(WEA_SVNGSVL_MCQ) %>%
+  mutate(
+    percent = round(100 * n / sum(n), 1)
+  )
+
+# savings/wealth barplot 
+p_wealth <- subset_data %>%
+  mutate(
+    wealth_cat = factor(
+      WEA_SVNGSVL_MCQ,
+      levels = c(1, 2, 3, 4, 8, 9),
+      labels = c(
+        "<50K",
+        "50K–100K",
+        "100K to <$1M",
+        "$1M+",
+        "Don't know/No answer",
+        "Refused"
+      )
+    )
+  ) %>%
+  count(wealth_cat, name = "n") %>%
+  arrange(n) %>%
+  ggplot(aes(x = n, y = wealth_cat)) +
+  geom_col(fill = "#2C7FB8", width = 0.7) +
+  labs(
+    title = "Total Savings and Investments",
+    x = "Number of Participants",
+    y = NULL
+  ) +
+  report_theme
+
+ggsave("Figures/savings_barplot.png", plot = p_wealth, width = 5, height = 4, dpi = 300)
+
+
+```
+
+
+
+# Plots_enviro  
+
+## Air pollution 
+
+
+### Compare PM25DALE_AYY_01 and pm25_1yr_com etc. 
+
+PM25DALYY_01_COM
+SO2OMIYY_COM
+O3CHGYY_01_COM
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+
+# ── PM2.5 ──────────────────────────────────────────────────────────────────────
+df_long <- subset_data %>%
+  select(PM25DALYY_01_COM, pm25_1yr_com) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value))
+
+p_pm25_density <- ggplot(df_long, aes(x = value, fill = variable, color = variable)) +
+  geom_density(alpha = 0.4) +
+  labs(title = "Distribution Comparison: PM25DALYY_01_COM vs pm25_1yr_com",
+       x = "PM2.5 Value", y = "Density") +
+  theme_minimal()
+ggsave("Figures/pm25_comparison_density.png", plot = p_pm25_density, width = 5, height = 4, dpi = 300)
+
+p_pm25_boxplot <- ggplot(df_long, aes(x = variable, y = value, fill = variable)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = 21) +
+  labs(title = "Boxplot Comparison: PM25DALYY_01_COM vs pm25_1yr_com",
+       x = "", y = "PM2.5 Value") +
+  theme_minimal()
+ggsave("Figures/pm25_comparison_boxplot.png", plot = p_pm25_boxplot, width = 5, height = 4, dpi = 300)
+
+summary(subset_data[, c("PM25DALYY_01_COM", "pm25_1yr_com")])
+
+# ── SO2 ────────────────────────────────────────────────────────────────────────
+df_long <- subset_data %>%
+  select(so2_1yr_com, SO2OMIYY_COM) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value))
+
+p_so2_density <- ggplot(df_long, aes(x = value, fill = variable, color = variable)) +
+  geom_density(alpha = 0.4) +
+  labs(title = "Distribution Comparison: so2_1yr_com vs SO2OMIYY_COM",
+       x = "SO2 Value", y = "Density") +
+  theme_minimal()
+ggsave("Figures/so2_comparison_density.png", plot = p_so2_density, width = 5, height = 4, dpi = 300)
+
+p_so2_boxplot <- ggplot(df_long, aes(x = variable, y = value, fill = variable)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = 21) +
+  labs(title = "Boxplot Comparison: so2_1yr_com vs SO2OMIYY_COM",
+       x = "", y = "SO2 Value") +
+  theme_minimal()
+ggsave("Figures/so2_comparison_boxplot.png", plot = p_so2_boxplot, width = 5, height = 4, dpi = 300)
+
+summary(subset_data[, c("so2_1yr_com", "SO2OMIYY_COM")])
+
+# ── Ozone ──────────────────────────────────────────────────────────────────────
+df_long <- subset_data %>%
+  select(O3CHGYY_01_COM, o3_1yr_com) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  filter(!is.na(value))
+
+p_o3_density <- ggplot(df_long, aes(x = value, fill = variable, color = variable)) +
+  geom_density(alpha = 0.4) +
+  labs(title = "Distribution Comparison: O3CHGYY_01_COM vs o3_1yr_com",
+       x = "O3 Value", y = "Density") +
+  theme_minimal()
+ggsave("Figures/o3_comparison_density.png", plot = p_o3_density, width = 5, height = 4, dpi = 300)
+
+p_o3_boxplot <- ggplot(df_long, aes(x = variable, y = value, fill = variable)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = 21) +
+  labs(title = "Boxplot Comparison: O3CHGYY_01_COM vs o3_1yr_com",
+       x = "", y = "O3 Value") +
+  theme_minimal()
+ggsave("Figures/o3_comparison_boxplot.png", plot = p_o3_boxplot, width = 5, height = 4, dpi = 300)
+
+summary(subset_data[, c("O3CHGYY_01_COM", "o3_1yr_com")])
+
+```
+
+
+
+```{r}
+ft <- flextable(summary_table) %>%
+  add_header_lines("Table X. Air Quality Exposures") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%  # title slightly bigger
+  bold(i = 1, part = "header") %>%                 # title bold
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%  # title centered
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
+
+save_as_image(ft, path = "Tables/Table_airquality.png", res = 300)
+```
+
+```{r}
+#air pollution dashboard 
+air_vars <- list(
+  list(col = "pm25_1yr_com",  title = "PM2.5 (µg/m³)", file = "pm25",  binwidth = 0.5, limits = c(3, 11),  breaks = seq(3, 11, by = 1)),
+  list(col = "no2_1yr_com",   title = "NO2 (ppb)",      file = "no2",   binwidth = 1,   limits = c(3, 16),  breaks = seq(3, 16, by = 2)),
+  list(col = "so2_1yr_com",   title = "SO2 (ppb)",      file = "so2",   binwidth = 0.1, limits = c(0, 3.2), breaks = seq(0, 3.2, by = 0.5)),
+  list(col = "o3_1yr_com",    title = "Ozone (ppb)",    file = "ozone", binwidth = 1,   limits = c(15, 33), breaks = seq(15, 33, by = 2))
+)
+
+air_plots <- list()
+
+for (v in air_vars) {
+  p <- ggplot(subset_data, aes(x = .data[[v$col]])) +
+    geom_histogram(binwidth = v$binwidth, fill = "steelblue", color = "white") +
+    scale_x_continuous(breaks = v$breaks, limits = v$limits) +
+    labs(title = v$title, x = v$title, y = "Count") +
+    report_theme +
+    theme(plot.title = element_text(size = 9))
+  
+  air_plots[[v$col]] <- p
+  ggsave(paste0("Figures/", v$file, "_histogram.png"), plot = p, width = 5, height = 4, dpi = 300)
+}
+
+dashboard_air <- wrap_plots(air_plots, ncol = 2) +
+  plot_annotation(
+    title = "Air Pollution Distributions",
+    theme = theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+  )
+
+ggsave("Figures/air_pollution_dashboard.png", plot = dashboard_air, width = 10, height = 8, dpi = 300)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Condensation/noise
+
+```{r}
+## 3.3 Condensation and noise 
+vars_housing <- list(
+  list(col = "ENV_HMPRB_CON_MCQ", label = "Condensation"),
+  list(col = "ENV_HMPRB_NOI_MCQ", label = "Noise")
+)
+
+summary_table_housing <- lapply(vars_housing, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable  = v$label,
+    `Yes n (%)` = paste0(sum(x == 1, na.rm=TRUE), " (", round(mean(x == 1, na.rm=TRUE)*100, 1), "%)"),
+    `No n (%)`  = paste0(sum(x == 0, na.rm=TRUE), " (", round(mean(x == 0, na.rm=TRUE)*100, 1), "%)"),
+    `Missing`   = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_housing <- flextable(summary_table_housing) %>%
+  add_header_lines("Table X. Problems with Housing") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Yes n (%)", "No n (%)", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_housing, path = "Tables/Table_housing.png", res = 300)
+```
+
+
+```{r}
+
+#Problems with condensation
+condensation_bar <- ggplot(subset_data, aes(x = factor(ENV_HMPRB_CON_MCQ))) +
+  geom_bar(fill = "steelblue", color = "white") +
+  geom_text(
+    aes(label = paste0(round(after_stat(count/sum(count)*100), 1), "%")),
+    stat = "count",
+    vjust = -0.5,
+    size = 4
+  ) +
+  scale_x_discrete(labels = c("0" = "No", "1" = "Yes")) +
+  labs(
+    title = "Problems with Condensation in Home",
+    x = "Condensation",
+    y = "Count"
+  ) +
+  report_theme +
+  theme(plot.margin = margin(t = 20, r = 10, b = 10, l = 10)) +
+  coord_cartesian(clip = "off")
+
+ggsave("Figures/condensation_bar.png", plot = condensation_bar, width = 5, height = 4, dpi = 300)
+
+
+
+
+#Problems with noise
+
+noise_bar <- ggplot(subset_data, aes(x = factor(ENV_HMPRB_NOI_MCQ))) +
+  geom_bar(fill = "steelblue", color = "white") +
+  geom_text(
+    aes(label = paste0(round(after_stat(count/sum(count)*100), 1), "%")),
+    stat = "count",
+    vjust = -0.5,
+    size = 4
+  ) +
+  scale_x_discrete(labels = c("0" = "No", "1" = "Yes")) +
+  labs(
+    title = "Problems with Noise",
+    x = "Noise",
+    y = "Count"
+  ) +
+  report_theme +
+  theme(plot.margin = margin(t = 20, r = 10, b = 10, l = 10)) +
+  coord_cartesian(clip = "off")
+
+ggsave("Figures/noise_bar.png", plot = noise_bar, width = 5, height = 4, dpi = 300)
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+## Tree Canopy Coverage (TCC)
+```{r}
+# Table 1 - Tree Canopy Coverage
+vars_canopy <- list(
+  list(col = "grtcc10_01_COM", label = "Mean % of pixel covered by vegetation >5m"),
+  list(col = "grtcc10_02_COM", label = "Mean % of pixel covered by vegetation >5m, within 100m"),
+  list(col = "grtcc10_03_COM", label = "Mean % of pixel covered by vegetation >5m, within 250m"),
+  list(col = "grtcc10_04_COM", label = "Mean % of pixel covered by vegetation >5m, within 500m"),
+  list(col = "grtcc10_05_COM", label = "Mean % of pixel covered by vegetation >5m, within 1km")
+)
+
+summary_table_canopy <- lapply(vars_canopy, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable            = v$label,
+    `Mean (SD)`         = paste0(round(mean(x, na.rm=TRUE), 2), " (", round(sd(x, na.rm=TRUE), 2), ")"),
+    `Median [Min, Max]` = paste0(round(median(x, na.rm=TRUE), 2), " [", round(min(x, na.rm=TRUE), 2), ", ", round(max(x, na.rm=TRUE), 2), "]"),
+    `Missing`           = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_canopy <- flextable(summary_table_canopy) %>%
+  add_header_lines("Table X. Tree Canopy Coverage") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  flextable::bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_canopy, path = "Tables/Table_treecanopy.png", res = 300)
+
+```
+
+
+
+```{r}
+# Tree canopy histogram dashboard 
+canopy_vars <- list(
+  list(col = "grtcc10_01_COM", title = "Estimated % Pixel Covered by Vegetation >5m",           file = "canopy_01"),
+  list(col = "grtcc10_02_COM", title = "Mean % Pixel Covered by Vegetation >5m within 100m",    file = "canopy_02"),
+  list(col = "grtcc10_03_COM", title = "Mean % Pixel Covered by Vegetation >5m within 250m",    file = "canopy_03"),
+  list(col = "grtcc10_04_COM", title = "Mean % Pixel Covered by Vegetation >5m within 500m",    file = "canopy_04"),
+  list(col = "grtcc10_05_COM", title = "Mean % Pixel Covered by Vegetation >5m within 1km",     file = "canopy_05")
+)
+
+for (v in canopy_vars) {# Save individual histograms
+  p <- ggplot(subset_data, aes(x = .data[[v$col]])) +
+    geom_histogram(binwidth = 5, fill = "forestgreen", color = "white") +
+    scale_x_continuous(breaks = c(0, 10, 20, 30, 40, 50, 60, 70, 80)) +
+    labs(title = v$title, x = "Tree Canopy Cover (%)", y = "Count") +
+    report_theme
+  ggsave(paste0("Figures/", v$file, "_histogram.png"), plot = p, width = 5, height = 4, dpi = 300)
+}
+
+canopy_plots <- list()# Dashboard
+
+for (v in canopy_vars) {
+  p <- ggplot(subset_data, aes(x = .data[[v$col]])) +
+    geom_histogram(binwidth = 5, fill = "forestgreen", color = "white") +
+    scale_x_continuous(breaks = c(0, 20, 40, 60, 80)) +
+    labs(title = v$title, x = "Tree Canopy Cover (%)", y = "Count") +
+    report_theme +
+    theme(plot.title = element_text(size = 8))
+  
+  canopy_plots[[v$col]] <- p
+}
+
+dashboard_canopy <- wrap_plots(canopy_plots, ncol = 3) +# 5 plots — arrange in 2 rows (3 top, 2 bottom)
+  plot_annotation(
+    title = "Tree Canopy Coverage Distributions",
+    theme = theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+  )
+
+ggsave("Figures/tree_canopy_dashboard.png", plot = dashboard_canopy, width = 15, height = 9, dpi = 300)
+
+
+```
+
+
+
+
+## Percent vegetation 
+
+```{r}
+# Table 2 - Vegetative Greenness
+vars_greenness <- list(
+  list(col = "GRUMPYY_01_COM", label = "Mean of annual % vegetative greenness, At postal code"),
+  list(col = "GRUMPYY_02_COM", label = "Mean of annual % vegetative greenness, within 100m"),
+  list(col = "GRUMPYY_03_COM", label = "Mean of annual % vegetative greenness, within 250m"),
+  list(col = "GRUMPYY_04_COM", label = "Mean of annual % vegetative greenness, within 500m"),
+  list(col = "GRUMPYY_05_COM", label = "Mean of annual % vegetative greenness, within 1km"),
+  list(col = "GRUMPYY_06_COM", label = "Max of annual % vegetative greenness, within 100m"),
+  list(col = "GRUMPYY_07_COM", label = "Max of annual % vegetative greenness, within 250m"),
+  list(col = "GRUMPYY_08_COM", label = "Max of annual % vegetative greenness, within 500m"),
+  list(col = "GRUMPYY_09_COM", label = "Max of annual % vegetative greenness, within 1km")
+)
+
+summary_table_greenness <- lapply(vars_greenness, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable            = v$label,
+    `Mean (SD)`         = paste0(round(mean(x, na.rm=TRUE), 2), " (", round(sd(x, na.rm=TRUE), 2), ")"),
+    `Median [Min, Max]` = paste0(round(median(x, na.rm=TRUE), 2), " [", round(min(x, na.rm=TRUE), 2), ", ", round(max(x, na.rm=TRUE), 2), "]"),
+    `Missing`           = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_greenness <- flextable(summary_table_greenness) %>%
+  add_header_lines("Table X. Percent Vegetative Greenness") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_greenness, path = "Tables/Table_percentveg.png", res = 300)
+```
+
+```{r}
+
+#Percent veg greenness histograms (9 of them)
+
+greenness_vars <- list(
+  list(col = "GRUMPYY_01_COM", title = "Annual % Vegetative Greenness at Postal Code",        file = "greenness_01"),
+  list(col = "GRUMPYY_02_COM", title = "Mean Annual % Vegetative Greenness within 100m",       file = "greenness_02"),
+  list(col = "GRUMPYY_03_COM", title = "Mean Annual % Vegetative Greenness within 250m",       file = "greenness_03"),
+  list(col = "GRUMPYY_04_COM", title = "Mean Annual % Vegetative Greenness within 500m",       file = "greenness_04"),
+  list(col = "GRUMPYY_05_COM", title = "Mean Annual % Vegetative Greenness within 1000m",      file = "greenness_05"),
+  list(col = "GRUMPYY_06_COM", title = "Max Annual % Vegetative Greenness within 100m",        file = "greenness_06"),
+  list(col = "GRUMPYY_07_COM", title = "Max Annual % Vegetative Greenness within 250m",        file = "greenness_07"),
+  list(col = "GRUMPYY_08_COM", title = "Max Annual % Vegetative Greenness within 500m",        file = "greenness_08"),
+  list(col = "GRUMPYY_09_COM", title = "Max Annual % Vegetative Greenness within 1000m",       file = "greenness_09")
+)
+
+for (v in greenness_vars) {
+  p <- ggplot(subset_data, aes(x = .data[[v$col]])) +
+    geom_histogram(binwidth = 5, fill = "forestgreen", color = "white") +
+    scale_x_continuous(breaks = c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90)) +
+    labs(title = v$title, x = "Vegetative Greenness (%)", y = "Count") +
+    report_theme
+  ggsave(paste0("Figures/", v$file, "_histogram.png"), plot = p, width = 5, height = 4, dpi = 300)
+}
+
+library(patchwork)
+
+# Use your loop to store plots in a list instead of saving individually
+greenness_plots <- list()
+
+for (v in greenness_vars) {
+  p <- ggplot(subset_data, aes(x = .data[[v$col]])) +
+    geom_histogram(binwidth = 5, fill = "forestgreen", color = "white") +
+    scale_x_continuous(breaks = c(0, 20, 40, 60, 80, 100)) +
+    labs(title = v$title, x = "Greenness (%)", y = "Count") +
+    report_theme +
+    theme(plot.title = element_text(size = 8))  # smaller title to fit
+  
+  greenness_plots[[v$col]] <- p
+}
+
+# Arrange in a 3x3 grid
+dashboard <- wrap_plots(greenness_plots, ncol = 3) +
+  plot_annotation(
+    title = "Vegetative Greenness Distributions",
+    theme = theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14))
+  )
+
+ggsave("Figures/greenness_dashboard.png", plot = dashboard, width = 15, height = 12, dpi = 300)
+
+
+
+
+ndvi_500m <- ggplot(subset_data, aes(x = GRLANYY_26_COM)) +
+  geom_histogram(binwidth = 5, fill = "forestgreen", color = "white") +
+  scale_x_continuous(breaks = c(0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100)) +
+  labs(
+    title = "Maximum Annual NDVI within 500m",
+    x = "NDVI (%)",
+    y = "Count"
+  ) +
+  report_theme
+
+ggsave("Figures/ndvi_500m_histogram.png", plot = ndvi_500m, width = 5, height = 4, dpi = 300)
+GRLANYY_26_COM
+```
+
+
+
+## NDVI 
+
+
+```{r}
+vars_ndvi <- list(
+  list(col = "GRLANYY_26_COM", label = "Maximum annual mean NVDI within 250m")
+)
+
+summary_table_ndvi <- lapply(vars_ndvi, function(v) {
+  x <- subset_data[[v$col]]
+  tibble(
+    Variable            = v$label,
+    `Mean (SD)`         = paste0(round(mean(x, na.rm=TRUE), 2), " (", round(sd(x, na.rm=TRUE), 2), ")"),
+    `Median [Min, Max]` = paste0(round(median(x, na.rm=TRUE), 2), " [", round(min(x, na.rm=TRUE), 2), ", ", round(max(x, na.rm=TRUE), 2), "]"),
+    `Missing`           = paste0(sum(is.na(x)), " (", round(mean(is.na(x))*100, 1), "%)")
+  )
+}) %>% bind_rows()
+
+ft_ndvi <- flextable(summary_table_ndvi) %>%
+  add_header_lines("Table X. Normalized Difference Vegetation Index (NDVI)") %>%
+  bold(part = "header") %>%
+  bold(j = "Variable") %>%
+  autofit() %>%
+  theme_booktabs() %>%
+  fontsize(size = 10, part = "all") %>%
+  fontsize(i = 1, size = 11, part = "header") %>%
+  bold(i = 1, part = "header") %>%
+  font(fontname = "Times New Roman", part = "all") %>%
+  align(i = 1, align = "center", part = "header") %>%
+  align(align = "left", part = "all") %>%
+  align(j = c("Mean (SD)", "Median [Min, Max]", "Missing"), align = "center", part = "body")
+
+save_as_image(ft_ndvi, path = "Tables/Table_ndvi.png", res = 300)
+```
+
+
+```{r}
+ndvi_500m <- ggplot(subset_data, aes(x = GRLANYY_26_COM)) +
+  geom_histogram(binwidth = 0.02, fill = "forestgreen", color = "white") +
+  scale_x_continuous(
+    breaks = seq(0.60, 1.00, by = 0.05),
+    limits = c(0.60, 1.00)
+  ) +
+  labs(
+    title = "Maximum Annual NDVI within 500m",
+    x = "NDVI",
+    y = "Count"
+  ) +
+  report_theme
+
+ggsave("Figures/ndvi_500m_histogram.png", plot = ndvi_500m, width = 5, height = 4, dpi = 300)
+
+```
+
+
+
+
+
+
+
+
+
+# Plots_Enviro by income (Pollution, condensation) 
+
+## Pollution by income 
+```{r}
+
+#pollution boxplots by income group 
+
+
+plot_data <- subset_data
+ggplot(data = plot_data, aes(x = income_cat, y = pm25_1yr_com)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "PM2.5 1 y average, by Income Group",
+    x = "Household Income",
+    y = "PM2.5 (µg/m³)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_pm25.png", width = 5, height = 4, dpi = 300)
+
+
+
+df %>% #check that there is significance for PM2.5 
+  group_by(income_cat) %>%
+  summarise(
+    n = n(),
+    median_pm25 = median(pm25_1yr_com, na.rm = TRUE),
+    mean_pm25 = round(mean(pm25_1yr_com, na.rm = TRUE), 2)
+  )
+kruskal.test(pm25_1yr_com ~ income_cat, data = df)
+
+
+
+ggplot(df_no2, aes(x = income_cat, y = no2_1yr_com)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "NO2 1 y average, by Income Group",
+    x = "Household Income",
+    y = "NO2 (ppb)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_no2.png", width = 5, height = 4, dpi = 300)
+
+
+
+ggplot(df_so2, aes(x = income_cat, y = so2_1yr_com)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "SO2 1 y average, by Income Group",
+    x = "Household Income",
+    y = "SO2 (ppb)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_so2.png", width = 5, height = 4, dpi = 300)
+
+
+
+ggplot(df_o3, aes(x = income_cat, y = o3_1yr_com)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "Ozone 1 y average, by Income Group",
+    x = "Household Income",
+    y = "Ozone (ppb)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_o3.png", width = 5, height = 4, dpi = 300)
+
+
+ggplot(df_greenness, aes(x = income_cat, y = GRLANYY_26_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "Max NDVI within 500m, by Income Group",
+    x = "Household Income",
+    y = "Greenness (NDVI)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_ndvi.png", width = 5, height = 4, dpi = 300)
+
+
+```
+
+
+
+## Pollution by income using the potentially better variables 
+
+
+PM25DALYY_01_COM
+SO2OMIYY_COM
+O3CHGYY_01_COM
+
+
+```{r}
+
+#PM25DALYY_01_COM by Income Group 
+
+plot_data <- subset_data
+
+ggplot(data = plot_data, aes(x = income_cat, y = PM25DALYY_01_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "PM2.5 1 year average, by Income Group",
+    x = "Household Income",
+    y = "PM2.5 (satellite, model-based) (µg/m³)"
+  ) +
+  report_theme
+ggsave("Figures/boxplot_PM25DALYY_01_COM.png", width = 5, height = 4, dpi = 300)
+
+
+
+plot_data %>% #check that there is significance for PM2.5 
+  group_by(income_cat) %>%
+  summarise(
+    n = n(),
+    median_pm25 = median(PM25DALYY_01_COM, na.rm = TRUE),
+    mean_pm25 = round(mean(PM25DALYY_01_COM, na.rm = TRUE), 2)
+  )
+kruskal.test(PM25DALYY_01_COM ~ income_cat, data = df)
+
+
+
+
+
+
+
+ggplot(plot_data, aes(x = income_cat, y = SO2OMIYY_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "SO2 3 year annual average at postal code, by Income Group",
+    x = "Household Income",
+    y = "3 y average SO2 (satellite derived)(ppb)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_SO2OMIYY_COM.png", width = 5, height = 4, dpi = 300)
+
+
+
+ggplot(plot_data, aes(x = income_cat, y = O3CHGYY_01_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "O3 annual average ground-level at postal code, by Income Group",
+    x = "Household Income",
+    y = "Annual average O3 (model-based) (ppb)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_O3CHGYY_01_COM.png", width = 5, height = 4, dpi = 300)
+
+
+
+
+```
+
+
+
+```{r}
+air_income_plots <- list()
+
+for (v in air_income_vars) {
+  p <- subset_data %>%
+    filter(income_cat %in% c("<20K", "20K–50K", "50K–100K", "100K–150K", "150K+")) %>%
+    ggplot(aes(x = income_cat, y = .data[[v$col]], fill = income_cat)) +
+    geom_boxplot(outlier.alpha = 0.3, width = 0.6) +
+    scale_fill_brewer(palette = "Blues") +
+    labs(
+      title = v$title,
+      x = "Household Income",
+      y = v$y_lab
+    ) +
+    report_theme +
+    theme(
+      plot.title = element_text(size = 13, face = "bold"),
+      axis.title = element_text(size = 11),
+      axis.text = element_text(size = 9),
+      legend.position = "none"
+    )
+  
+  air_income_plots[[v$col]] <- p
+}
+
+dashboard_air_income <- wrap_plots(air_income_plots, ncol = 2) &
+  theme(
+    plot.margin = margin(t = 15, r = 15, b = 15, l = 15),
+    plot.background = element_rect(color = "grey60", linewidth = 1, fill = "white"),
+    panel.background = element_rect(fill = "white")
+  )
+
+dashboard_air_income <- dashboard_air_income +
+  plot_annotation(
+    title = "Air Pollution by Household Income",
+    theme = theme(
+      plot.title    = element_text(hjust = 0.5, face = "bold", size = 22),
+      plot.subtitle = element_text(hjust = 0.5, size = 11, color = "grey40"),
+      plot.caption  = element_text(size = 9, color = "grey40"),
+      plot.margin   = margin(t = 20, r = 10, b = 10, l = 10),
+      plot.background = element_rect(fill = "grey90", color = NA)
+    )
+  )
+
+ggsave("Figures/air_pollution_income_dashboard.png", plot = dashboard_air_income, width = 16, height = 13, dpi = 300)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Condensation by income 
+
+```{r}
+#condensation by income
+
+cond_only <- subset_data %>% #keep only those with condensation problems (54 people)
+  filter(ENV_HMPRB_CON_MCQ == 1)
+
+cond_counts <- cond_only %>%
+  filter(INC_TOT_COM %in% 1:5) %>%
+  mutate(income_cat = factor(INC_TOT_COM, levels = 1:5, labels = income_labels)) %>%
+  count(income_cat, name = "n") %>%
+  mutate(pct = n / sum(n))
+
+cond_counts
+
+ggplot(cond_counts, aes(x = income_cat, y = n)) +
+  geom_col(fill = "#2C7FB8", width = 0.6) +
+  geom_text(
+    aes(label = paste0(n, " (", percent(pct, accuracy = 0.1), ")")),
+    vjust = -0.35,
+    size = 3.2  # scaled to base_size 11 theme
+  ) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(
+    title = "Homes with Condensation, by Income Group",
+    x = "Household Income",
+    y = "Homes with Condensation"
+  ) +
+  report_theme
+
+ggsave("Figures/barplot_condensation.png", width = 5, height = 4, dpi = 300)
+
+
+
+
+
+ggplot(df, aes(x = income_cat, y = pm25_1yr_com)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(
+    title = "PM2.5 1 y average, by Income Group",
+    x = "Household Income",
+    y = "PM2.5 (µg/m³)"
+  ) +
+  report_theme
+
+ggsave("Figures/boxplot_pm25.png", width = 5, height = 4, dpi = 300)
+
+```
+
+
+
+
+
+
+
+
+## TCC by income
+```{r}
+
+#tree canopy by income, boxplots 
+p_veg1 <- ggplot(df, aes(x = income_cat, y = grtcc10_01_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(title = "Vegetation Cover (>5m) by Income Group",
+       x = "Household Income", y = "% Pixel Covered by Vegetation >5m") +
+  report_theme
+ggsave("Figures/boxplot_vegetation_01.png", plot = p_veg1, width = 5, height = 4, dpi = 300)
+
+
+p_veg2 <- ggplot(df, aes(x = income_cat, y = grtcc10_02_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(title = "Vegetation Cover (>5m) by Income, 100m",
+       x = "Household Income", y = "% Pixel Covered by Vegetation >5m") +
+  report_theme
+ggsave("Figures/boxplot_vegetation_02.png", plot = p_veg2, width = 5, height = 4, dpi = 300)
+
+
+p_veg3 <- ggplot(df, aes(x = income_cat, y = grtcc10_03_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(title = "Vegetation Cover (>5m) by Income, 250m",
+       x = "Household Income", y = "% Pixel Covered by Vegetation >5m") +
+  report_theme
+ggsave("Figures/boxplot_vegetation_03.png", plot = p_veg3, width = 5, height = 4, dpi = 300)
+
+
+p_veg4 <- ggplot(df, aes(x = income_cat, y = grtcc10_04_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(title = "Vegetation Cover (>5m) by Income, 500m",
+       x = "Household Income", y = "% Pixel Covered by Vegetation >5m") +
+  report_theme
+ggsave("Figures/boxplot_vegetation_04.png", plot = p_veg4, width = 5, height = 4, dpi = 300)
+
+
+p_veg5 <- ggplot(df, aes(x = income_cat, y = grtcc10_05_COM)) +
+  geom_boxplot(fill = "#2C7FB8", outlier.alpha = 0.5, width = 0.6) +
+  labs(title = "Vegetation Cover (>5m) by Income, 1km",
+       x = "Household Income", y = "% Pixel Covered by Vegetation >5m") +
+  report_theme
+ggsave("Figures/boxplot_vegetation_05.png", plot = p_veg5, width = 5, height = 4, dpi = 300)
+
+
+
+
+
+df <- subset_data %>%
+  filter(INC_TOT_COM %in% 1:5, !is.na(grtcc10_01_COM)) %>%
+  mutate(
+    income_cat = factor(INC_TOT_COM, levels = 1:5, labels = income_labels)
+  )
+
+ggplot(df, aes(x = income_cat, y = grtcc10_01_COM)) +
+  geom_boxplot(
+    fill = "#2C7FB8",
+    outlier.alpha = 0.5,
+    width = 0.6
+  ) +
+  labs(
+    title = "Vegetation Cover (>5m) by Income Group",
+    x = "Household Income",
+    y = "Estimated % Pixel Covered by Vegetation >5m"
+  ) +
+  theme_classic(base_size = 26) +
+  theme(
+    legend.position = "none",
+    
+    plot.title = element_text(
+      hjust = 0.5,
+      face  = "bold",
+      size  = 38,
+      margin = margin(b = 18)
+    ),
+    
+    axis.title.x = element_text(
+      face = "bold",
+      size = 30,
+      margin = margin(t = 16)
+    ),
+    axis.title.y = element_text(
+      face = "bold",
+      size = 30,
+      margin = margin(r = 16)
+    ),
+    
+    axis.text.x = element_text(size = 26),
+    axis.text.y = element_text(size = 26)
+  )
+```
+
+
+
+
+
+## Veg greenness fractions by income 
+There is no pattern by income group. The values are all clustered between 26–31%.
+The GRUMPY variable measures all green vegetation including grass, shrubs, parks — not just tree canopy in residential areas.
+
+
+```{r}
+
+library(flextable)
+
+df_green_summary <- df %>%
+  group_by(income_cat) %>%
+  summarise(
+    n = n(),
+    median_green = median(GRUMPYY_01_COM, na.rm = TRUE),
+    mean_green = round(mean(GRUMPYY_01_COM, na.rm = TRUE), 1)
+  ) %>%
+  rename(
+    `Income Group` = income_cat,
+    `N` = n,
+    `Median Greenness (%)` = median_green,
+    `Mean Greenness (%)` = mean_green
+  )
+
+ft_green <- flextable(df_green_summary) %>%
+  flextable::add_header_lines("Table X. Vegetation Greenness (GRUMPY) by Income Group") %>%
+  flextable::bold(part = "header") %>%
+  flextable::bold(j = "Income Group") %>%
+  flextable::autofit() %>%
+  flextable::theme_booktabs() %>%
+  flextable::fontsize(size = 10, part = "all") %>%
+  flextable::fontsize(i = 1, size = 11, part = "header") %>%
+  flextable::bold(i = 1, part = "header") %>%
+  flextable::font(fontname = "Times New Roman", part = "all") %>%
+  flextable::align(i = 1, align = "center", part = "header") %>%
+  flextable::align(align = "left", part = "all") %>%
+  flextable::align(j = c("N", "Median Greenness (%)", "Mean Greenness (%)"), align = "center", part = "body")
+
+save_as_image(ft_green, path = "Tables/Table_veg_green_fraction_byincome.png", res = 300)
+
+```
+
+
+
+
+## Road length (nearby) by income 
+This was not a good variable to look at. 
+
+```{r}
+#median hwy length within 200 m, by income group, just the participants living near a hwy 
+
+p_hwy_dot <- ggplot(df_hwy_summary, aes(x = income_cat, y = median_length)) +
+  geom_point(size = 4, color = "#2C7FB8", aes(shape = "Median")) +
+  geom_text(aes(label = paste0("n=", n)), vjust = 2, size = 3.5) +
+  scale_shape_manual(name = "", values = c("Median" = 16)) +
+  scale_y_continuous(limits = c(40, 105)) +
+  labs(title = "Median Highway Length within 200m by Income Group",
+       subtitle = "Among participants living near a highway only",
+       x = "Household Income",
+       y = "Median Highway Length (m)") +
+  report_theme
+ggsave("Figures/highway_median_dot.png", plot = p_hwy_dot, 
+       width = 6, height = 4, dpi = 300)
+
+
+#median road length within 200 m, by income group, just the participants living near a road 
+
+df_local <- df %>% filter(Locrds_length_200m_com > 0)
+
+df_local_summary <- df_local %>%
+  group_by(income_cat) %>%
+  summarise(
+    n = n(),
+    median_length = median(Locrds_length_200m_com, na.rm = TRUE)
+  )
+
+p_local_dot <- ggplot(df_local_summary, aes(x = income_cat, y = median_length)) +
+  geom_point(size = 4, color = "#2C7FB8", aes(shape = "Median")) +
+  geom_text(aes(label = paste0("n=", n)), vjust = 2, size = 3.5) +
+  scale_shape_manual(name = "", values = c("Median" = 16)) +
+  labs(title = "Median Local Road Length within 200m by Income Group",
+       subtitle = "Among participants living near a local road only",
+       x = "Household Income",
+       y = "Median Local Road Length (m)") +
+  report_theme
+
+ggsave("Figures/localroad_median_dot.png", plot = p_local_dot,
+       width = 6, height = 4, dpi = 300)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Plots for presentation 
+
+
+```{r}
+air_income_plots_pres <- list()
+
+for (v in air_income_vars) {
+  p <- subset_data %>%
+    filter(income_cat %in% c("<20K", "20K–50K", "50K–100K", "100K–150K", "150K+")) %>%
+    ggplot(aes(x = income_cat, y = .data[[v$col]], fill = income_cat)) +
+    geom_boxplot(outlier.alpha = 0.3, width = 0.6) +
+    scale_fill_brewer(palette = "Blues") +
+    labs(
+      title = v$title,
+      x = "Household Income",
+      y = v$y_lab
+    ) +
+    report_theme +
+    report_theme +
+theme(
+  plot.title      = element_text(size = 22, face = "bold"),
+  axis.title.x    = element_text(size = 20, face = "bold", margin = margin(t = 6)),
+  axis.title.y    = element_text(size = 20, face = "bold", margin = margin(r = 6)),
+  axis.text.x     = element_text(size = 18),
+  axis.text.y     = element_text(size = 18),
+  legend.position = "none",
+  plot.margin      = margin(t = 15, r = 15, b = 15, l = 15),
+  plot.background  = element_rect(color = "grey60", linewidth = 1, fill = "white"),
+  panel.background = element_rect(fill = "white")
+)
+  
+  
+  
+  
+  air_income_plots_pres[[v$col]] <- p
+}
+
+dashboard_air_income_pres <- wrap_plots(air_income_plots_pres, ncol = 2) +
+  plot_annotation(
+    title = "Air Pollution by Household Income",
+    theme = theme(
+      plot.title      = element_text(hjust = 0.5, face = "bold", size = 28),
+      plot.margin     = margin(t = 20, r = 10, b = 10, l = 10),
+      plot.background = element_rect(fill = "grey90", color = NA)
+    )
+  )
+
+
+ggsave("Figures/air_pollution_income_dashboard_PRESENTATION.png",
+       plot = dashboard_air_income_pres, width = 18, height = 14, dpi = 300)
+
+
+
+
+
+```
+
+
+
+
+
+
+# TO DO LIST  
+-imputation - check the diagnostic plots and make sure they are ok 
+-rurun models in a separate RMD (keep the other as a sensitivity analysis). reformat tables 2,3,4 to make sure column titles are ok. 
+-mediation model 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# REFERENCE NOTES
+Meeting with Keenan june 16, 2026:
+
+Keenan: CLSA_KE 
+https://github.com/StringhiniLab/CLSA_KE
+TrajectoryAnalysis_ImpBio.R
+lines 1015-1033 
+income categories become just 1-5. but keep in mind it's not really linear, there are differences between 1-2 that are different than between 4-5. 
+
+model: line 1045 
+
+Trajectory_HealthOutcomes.R
+mediation line # 699
+
+use officer package in R 
+
+-report only main findings: https://pmc.ncbi.nlm.nih.gov/articles/PMC10321643/
+
+
+
+# OTHER STUFF_DELETE
+
+
+
+### Categorical income 
+
+```{r, eval = FALSE}
+
+# Regression: Income predicting biological aging
+
+class(subset_data$AGE_NMBR_COM)#these are integers, ok to leave alone
+class(subset_data$CD4nv) 
+
+#stratify by age 
+subset_data$age_group <- ifelse(subset_data$AGE_NMBR_COM < 65, "45-64", "65-85")
+subset_data_firstgrp  <- subset_data[subset_data$age_group == "45-64", ]
+subset_data_secondgrp <- subset_data[subset_data$age_group == "65-85", ]
+table(subset_data$INC_TOT_COM) #make sure it is reverse coded 
+
+#GrimAge 
+library(broom)
+model <- lm(GrimAge_EAA ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_firstgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/GrimAge_model_results_45to64.csv", row.names = FALSE)
+
+model <- lm(GrimAge_EAA ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_secondgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/GrimAge_model_results_65to85.csv", row.names = FALSE)
+
+# PhenoAge
+model <- lm(PhenoAge_EAA ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_firstgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/PhenoAge_model_results_45to64.csv", row.names = FALSE)
+
+model <- lm(PhenoAge_EAA ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_secondgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/PhenoAge_model_results_65to85.csv", row.names = FALSE)
+
+# DunedinPACE
+model <- lm(DunedinPACE ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_firstgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/DunedinPACE_model_results_45to64.csv", row.names = FALSE)
+
+model <- lm(DunedinPACE ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_secondgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/DunedinPACE_model_results_65to85.csv", row.names = FALSE)
+
+# DNAmIC
+model <- lm(DNAmIC ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_firstgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/DNAmIC_model_results_45to64.csv", row.names = FALSE)
+
+model <- lm(DNAmIC ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data_secondgrp)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/DNAmIC_model_results_65to85.csv", row.names = FALSE)
+
+
+
+
+
+
+
+###########
+#make into a nice table 
+
+library(tidyr)
+
+read_model <- function(file, outcome, age_group) {
+  read.csv(file) %>%
+    mutate(Outcome = outcome, Age_Group = age_group)
+}
+
+all_results <- bind_rows(
+  read_model("regression_csvs/GrimAge_model_results_45to64.csv",     "GrimAge EAA",  "45-64"),
+  read_model("regression_csvs/GrimAge_model_results_65to85.csv",     "GrimAge EAA",  "65-85"),
+  read_model("regression_csvs/PhenoAge_model_results_45to64.csv",    "PhenoAge EAA", "45-64"),
+  read_model("regression_csvs/PhenoAge_model_results_65to85.csv",    "PhenoAge EAA", "65-85"),
+  read_model("regression_csvs/DunedinPACE_model_results_45to64.csv", "DunedinPACE",  "45-64"),
+  read_model("regression_csvs/DunedinPACE_model_results_65to85.csv", "DunedinPACE",  "65-85"),
+  read_model("regression_csvs/DNAmIC_model_results_45to64.csv",      "DNAmIC",       "45-64"),
+  read_model("regression_csvs/DNAmIC_model_results_65to85.csv",      "DNAmIC",       "65-85")
+)
+
+table_data <- all_results %>%
+  filter(grepl("INC_TOT_COM", term)) %>%
+  mutate(
+    term = recode(term,
+      "INC_TOT_COM2" = "100-150K",
+      "INC_TOT_COM3" = "50-100K",
+      "INC_TOT_COM4" = "20-50K",
+      "INC_TOT_COM5" = "<20K",
+      "INC_TOT_COM6" = "Don't know/Refused"
+    ),
+    Result = ifelse(
+      Outcome == "DNAmIC",
+      paste0(formatC(estimate, format = "e", digits = 2),
+             " (", formatC(conf.low, format = "e", digits = 2),
+             ", ", formatC(conf.high, format = "e", digits = 2), ")"),
+      ifelse(
+        abs(estimate) < 0.01,
+        paste0(round(estimate, 4), " (", round(conf.low, 4), ", ", round(conf.high, 4), ")"),
+        paste0(round(estimate, 2), " (", round(conf.low, 2), ", ", round(conf.high, 2), ")")
+      )
+    ),
+    sig = p.value < 0.05,
+    p.value = ifelse(round(p.value, 3) == 0, "<0.001", as.character(round(p.value, 3))),
+    Result = ifelse(sig, paste0("**", Result, "**"), Result),
+    Result_with_p = paste0(Result, ", p=", p.value)
+  ) %>%
+  select(Outcome, Age_Group, term, Result_with_p)
+
+table_wide <- table_data %>%
+  pivot_wider(names_from = Outcome, values_from = Result_with_p)
+
+table_45 <- table_wide %>% filter(Age_Group == "45-64") %>% select(-Age_Group)
+table_65 <- table_wide %>% filter(Age_Group == "65-85") %>% select(-Age_Group)
+
+table_final <- bind_rows(table_45, table_65)
+
+write.csv(table_final, "all_model_results_summary.csv", row.names = FALSE)
+
+save_kable(
+  knitr::kable(table_final,
+               col.names = c("Income Group", "GrimAge EAA", "PhenoAge EAA", "DunedinPACE", "DNAmIC"),
+               caption = "Table X: Association between household income and epigenetic aging, stratified by age group",
+               escape = TRUE) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE) %>%
+    pack_rows("45-64 years", 1, nrow(table_45)) %>%
+    pack_rows("65-85 years", nrow(table_45) + 1, nrow(table_final)),
+  "Figures/income_epigenetic_table.png", zoom = 2
+)
+
+
+
+```
+
+
+### Categorical income 
+income predicting environment 
+
+```{r}
+## do all the regressions first 
+
+levels(subset_data$INC_TOT_COM)
+
+#Income predicting PM2.5 
+library(broom)
+model <- lm(PM25DALYY_01_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_PM2.5.csv", row.names = FALSE)
+
+
+#income predicting ozone
+model <- lm(O3CHGYY_01_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_ozone.csv", row.names = FALSE)
+
+
+
+#Income predicting NO2 
+model <- lm(no2_1yr_com ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_NO2.csv", row.names = FALSE)
+
+
+
+#Income predicting SO2 
+model <- lm(so2_1yr_com ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_SO2.csv", row.names = FALSE)
+
+
+
+#Income predicting condensation
+subset_data$condensation_binary <- as.numeric(subset_data$ENV_HMPRB_CON_MCQ == "Yes") #first make condensation numeric b/c it is outcome now. 
+model <- lm(condensation_binary ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_condensation.csv", row.names = FALSE)
+
+
+
+
+############################
+#TCC
+
+
+# Tree canopy cover at postal code
+model <- lm(grtcc10_01_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_TreeCanopyPostalCode.csv", row.names = FALSE)
+
+# Tree canopy cover within 100m
+model <- lm(grtcc10_02_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_TreeCanopy100m.csv", row.names = FALSE)
+
+# Tree canopy cover within 250m
+model <- lm(grtcc10_03_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_TreeCanopy250m.csv", row.names = FALSE)
+
+# Tree canopy cover within 500m
+model <- lm(grtcc10_04_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_TreeCanopy500m.csv", row.names = FALSE)
+
+# Tree canopy cover within 1km
+model <- lm(grtcc10_05_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_TreeCanopy1km.csv", row.names = FALSE)
+
+
+
+
+#####################
+#% veg greenness 
+
+# Vegetative greenness at postal code
+model <- lm(GRUMPYY_01_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_GreennessPostalCode.csv", row.names = FALSE)
+
+# Vegetative greenness mean within 100m
+model <- lm(GRUMPYY_02_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_GreennessMean100m.csv", row.names = FALSE)
+
+# Vegetative greenness mean within 250m
+model <- lm(GRUMPYY_03_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_GreennessMean250m.csv", row.names = FALSE)
+
+# Vegetative greenness mean within 500m
+model <- lm(GRUMPYY_04_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_GreennessMean500m.csv", row.names = FALSE)
+
+# Vegetative greenness mean within 1000m
+model <- lm(GRUMPYY_05_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_GreennessMean1000m.csv", row.names = FALSE)
+
+# Vegetative greenness max within 100m
+model <- lm(GRUMPYY_06_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_GreennessMax100m.csv", row.names = FALSE)
+
+# Vegetative greenness max within 250m
+model <- lm(GRUMPYY_07_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_GreennessMax250m.csv", row.names = FALSE)
+
+# Vegetative greenness max within 500m
+model <- lm(GRUMPYY_08_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_GreennessMax500m.csv", row.names = FALSE)
+
+# Vegetative greenness max within 1000m
+model <- lm(GRUMPYY_09_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_GreennessMax1000m.csv", row.names = FALSE)
+
+
+#####################
+# NDVI (Max 500m)
+model <- lm(GRLANYY_26_COM ~ INC_TOT_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+               I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+             + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+             data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "regression_csvs/Income_NDVI.csv", row.names = FALSE)
+
+
+
+
+
+
+```
+
+
+
+
+```{r}
+
+#Make nice tables for regressions of income predicting environment 
+
+levels(subset_data$INC_TOT_COM)
+
+income_labels <- c(
+  "INC_TOT_COM100\u2013150K"                = "100-150K",
+  "INC_TOT_COM50\u2013100K"                 = "50-100K",
+  "INC_TOT_COM20\u201350K"                  = "20-50K",
+  "INC_TOT_COM<20K"                         = "<20K",
+  "INC_TOT_COMDon't know/No answer/Refused" = "Don't know/Refused"
+)
+
+read_model <- function(file, outcome) {
+  read.csv(file) %>% mutate(Outcome = outcome)
+}
+
+format_result <- function(data) {
+  data %>%
+    filter(grepl("INC_TOT_COM", term)) %>%
+    mutate(
+      term = recode(term, !!!income_labels),
+      Result = ifelse(
+        abs(estimate) < 0.01,
+        paste0(round(estimate, 4), " (", round(conf.low, 4), ", ", round(conf.high, 4), ")"),
+        paste0(round(estimate, 2), " (", round(conf.low, 2), ", ", round(conf.high, 2), ")")
+      ),
+      sig = p.value < 0.05,
+      p.value = ifelse(round(p.value, 3) == 0, "<0.001", as.character(round(p.value, 3))),
+      Result = ifelse(sig, paste0("**", Result, "**"), Result),
+      Result_with_p = paste0(Result, ", p=", p.value)
+    )
+}
+
+make_table <- function(data, col_names, caption, filename) {
+  save_kable(
+    knitr::kable(data, col.names = col_names, caption = caption, escape = TRUE) %>%
+      kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE),
+    filename, zoom = 2
+  )
+}
+
+# Air pollution
+bind_rows(
+  read_model("regression_csvs/Income_PM2.5.csv",  "PM2.5"),
+  read_model("regression_csvs/Income_ozone.csv",  "Ozone (O3)"),
+  read_model("regression_csvs/Income_NO2.csv",    "NO2"),
+  read_model("regression_csvs/Income_SO2.csv",    "SO2")
+) %>% format_result() %>%
+  select(Outcome, term, Result_with_p) %>%
+  pivot_wider(names_from = Outcome, values_from = Result_with_p) %>%
+  make_table(c("Income Group", "PM2.5", "Ozone (O3)", "NO2", "SO2"),
+             "Table X: Association between household income and air pollution exposures",
+             "Figures/income_airpollution_table.png")
+
+# Condensation
+read_model("regression_csvs/Income_condensation.csv", "Condensation") %>%
+  format_result() %>%
+  select(term, Result_with_p) %>%
+  make_table(c("Income Group", "Condensation"),
+             "Table X: Association between household income and housing condensation",
+             "Figures/income_condensation_table.png")
+
+# Tree Canopy Cover
+bind_rows(
+  read_model("regression_csvs/Income_TreeCanopyPostalCode.csv", "Postal code"),
+  read_model("regression_csvs/Income_TreeCanopy100m.csv",       "100m"),
+  read_model("regression_csvs/Income_TreeCanopy250m.csv",       "250m"),
+  read_model("regression_csvs/Income_TreeCanopy500m.csv",       "500m"),
+  read_model("regression_csvs/Income_TreeCanopy1km.csv",        "1km")
+) %>% format_result() %>%
+  select(Outcome, term, Result_with_p) %>%
+  pivot_wider(names_from = Outcome, values_from = Result_with_p) %>%
+  make_table(c("Income Group", "Postal code", "100m", "250m", "500m", "1km"),
+             "Table X: Association between household income and tree canopy cover",
+             "Figures/income_treecanopy_table.png")
+
+# Vegetative Greenness
+bind_rows(
+  read_model("regression_csvs/Income_GreennessPostalCode.csv", "Postal code"),
+  read_model("regression_csvs/Income_GreennessMean100m.csv",   "Mean 100m"),
+  read_model("regression_csvs/Income_GreennessMean250m.csv",   "Mean 250m"),
+  read_model("regression_csvs/Income_GreennessMean500m.csv",   "Mean 500m"),
+  read_model("regression_csvs/Income_GreennessMean1000m.csv",  "Mean 1000m"),
+  read_model("regression_csvs/Income_GreennessMax100m.csv",    "Max 100m"),
+  read_model("regression_csvs/Income_GreennessMax250m.csv",    "Max 250m"),
+  read_model("regression_csvs/Income_GreennessMax500m.csv",    "Max 500m"),
+  read_model("regression_csvs/Income_GreennessMax1000m.csv",   "Max 1000m")
+) %>% format_result() %>%
+  select(Outcome, term, Result_with_p) %>%
+  pivot_wider(names_from = Outcome, values_from = Result_with_p) %>%
+  make_table(c("Income Group", "Postal code", "Mean 100m", "Mean 250m", "Mean 500m",
+               "Mean 1000m", "Max 100m", "Max 250m", "Max 500m", "Max 1000m"),
+             "Table X: Association between household income and vegetative greenness",
+             "Figures/income_greenness_table.png")
+
+# NDVI
+read_model("regression_csvs/Income_NDVI.csv", "NDVI (Max 500m)") %>%
+  format_result() %>%
+  select(term, Result_with_p) %>%
+  make_table(c("Income Group", "NDVI (Max 500m)"),
+             "Table X: Association between household income and NDVI",
+             "Figures/income_NDVI_table.png")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+
+PM25DALYY_01_COM
+SO2OMIYY_COM
+O3CHGYY_01_COM
+
+
+#pm2.5
+model <- lm(GrimAge_EAA ~ PM25DALYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_grimage.csv", row.names = FALSE)
+
+model <- lm(PhenoAge_EAA ~ PM25DALYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_phenoage.csv", row.names = FALSE)
+
+model <- lm(DunedinPACE ~ PM25DALYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_Duned.csv", row.names = FALSE)
+
+model <- lm(DNAmIC ~ PM25DALYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)
+write.csv(results, "pm25_IC.csv", row.names = FALSE)
+
+
+
+
+
+#so2_1yr_com
+model <- lm(GrimAge_EAA ~ SO2OMIYY_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_grimage.csv", row.names = FALSE)
+
+
+model <- lm(PhenoAge_EAA ~ SO2OMIYY_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_phenoage.csv", row.names = FALSE)
+
+
+model <- lm(DunedinPACE ~ SO2OMIYY_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_Duned.csv", row.names = FALSE)
+
+
+model <- lm(DNAmIC ~ SO2OMIYY_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_IC.csv", row.names = FALSE)
+
+
+
+
+#ozone
+model <- lm(GrimAge_EAA ~ O3CHGYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_grimage.csv", row.names = FALSE)
+
+
+model <- lm(PhenoAge_EAA ~ O3CHGYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_phenoage.csv", row.names = FALSE)
+
+
+model <- lm(DunedinPACE ~ O3CHGYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_Duned.csv", row.names = FALSE)
+
+
+model <- lm(DNAmIC ~ O3CHGYY_01_COM + SEX_ASK_COM + AGE_NMBR_COM + 
+              I(AGE_NMBR_COM^2) + WGHTS_PROV_COM + Race7
+            + CD4nv + CD8nv + Mono + Treg + CD4mem + CD8mem + NK + Bmem + Bnv,
+            data = subset_data)
+results <- tidy(model, conf.int = TRUE, conf.level = 0.95)# Tidy table with estimates, SE, t, p, and 95% CI
+write.csv(results, "pm25_IC.csv", row.names = FALSE)
+
+
+```
+
+
+
+
+

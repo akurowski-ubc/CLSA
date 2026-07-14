@@ -1,0 +1,148 @@
+---
+title: "Socioeconomic determinants and biological aging: Exploring the potential mediating role of environmental exposures in the Canadian Longitudinal Study on Aging"
+output:
+  word_document:
+    reference_docx: style_reference.docx
+bibliography: References/references.bib
+csl: References/nature.csl
+---
+
+```{r, echo = FALSE, warning = FALSE}
+library(knitr)
+knitr::opts_chunk$set(
+  dpi = 300
+)
+```
+
+
+
+METHODS
+
+# Study Design
+
+Data were drawn from the Canadian Longitudinal Study on Aging (CLSA), a national, long-term cohort study that follows Canadian adults to understand biological, medical, psychological, social, and economic aspects of aging [@rainaCohortProfileCanadian2019]. Participants were eligible if they were aged 45–85 years at enrolment and residing in one of the 10 Canadian provinces. The CLSA is composed of two cohorts: a Tracking cohort of 21,241 participants interviewed by telephone, and a Comprehensive cohort of 30,097 participants who were both interviewed in-home, and had physical examinations and biological specimens collected at 11 data collection sites. Baseline data collection occurred from 2011 to 2015, and follow up data collection has been occurring every 3 years. 
+
+At baseline, all participants completed questionnaire-based assessments covering sociodemographic, lifestyle, and health-related information. Comprehensive cohort participants additionally underwent physical measurements and provided blood and urine samples at one of eleven data collection sites located across seven provinces. 
+
+# Study population
+
+The current analysis focuses on a subset of Comprehensive cohort participants selected for genome-wide DNA methylation (DNAm) profiling at baseline. Of the 30,097 participants enrolled in the CLSA Comprehensive cohort at baseline, 23,492 had provided blood and urine samples with available EDTA whole blood and Buffy coat. From this group, 10,000 participants were selected for genomics and metabolomics analyses: 3,000 from the 6,268 participants who had fasted for five or more hours, and 7,000 from the remaining non-fasting participants. A sub-sample of 1,500 participants was subsequently selected from this pool for epigenetic analysis. All sample selections were made to reflect the distribution of the Comprehensive cohort by age, sex, and data collection site, rather than through random selection. Of the 1,500 selected for epigenetic analysis, 1,478 were successfully assayed for DNA methylation, and 1,445 passed stringent quality control assessments and were included in the final analytic sample [@zotero-item-786].
+
+# Measures 
+
+## Biological Aging Outcomes
+
+Four DNA methylation-based epigenetic measures were used as outcome measures, each trained to capture distinct aspects of biological aging. PhenoAge was trained on a composite of nine clinical biomarkers of aging-related disease mortality (including heart disease, cancer, chronic respiratory disease, cerebrovascular disease, Alzheimer's disease, diabetes, and kidney disease) and chronological age, and is a strong predictor of phenotypic age and mortality risk [@levineEpigeneticBiomarkerAging2018].GrimAge was trained to predict seven plasma proteins related to aging-related morbidity and mortality risk and smoking pack-years, and is a strong predictor of time-to-death and disease risk [@luDNAMethylationGrimAge2019].
+DunedinPACE was trained on 19 biomarkers of organ-system integrity, measured across four time points over 20 years to capture the rate of biological decline, providing a measure of the pace of aging rather than a biological age estimate [@belskyDunedinPACEDNAMethylation2022]. DNAm Intrinsic Capacity is a novel measure that was trained to predict an intrinsic capacity score based on five factors: cognition, locomotion, psychology, sensory ability, and vitality. This measure predicts functional decline and mortality [@fuentealbaBloodbasedEpigeneticClock2025a]. In contrast to the epigenetic age acceleration measures (PhenoAge, GrimAge, and DunedinPACE), for which higher values indicate faster biological aging, higher DNAmIC indicates better functional status.
+
+
+## Socioeconomic Conditions
+
+Total household income was used as an indicator of socioeconomic conditions. Participants were asked to report their best estimate of total household income received by all household members, from all sources, before taxes and deductions, in the past 12 months. Income was categorized into five groups: less than $20,000; $20,000 to less than $50,000; $50,000 to less than $100,000; $100,000 to less than $150,000; and $150,000 or more. Participants who responded "don't know," refused to respond, or provided no answer were retained in the analysis and classified as separate categories.
+
+
+## Environmental Exposures
+
+Environmental exposures included air pollution, housing condensation, vegetative greenness fraction, tree canopy cover, and Normalized Difference Vegetation Index (NDVI), a greenness index. Air pollution, tree canopy cover, and greenness measures are from the Canadian Urban Environmental Health Research Consortium (CANUE) and are linked to CLSA data [@CLSALinksCANUE2018].
+
+Four air pollution measures were included: fine particulate matter (PM2.5), ozone (O~3~), nitrogen dioxide (NO~2~), and sulfur dioxide (SO~2~). PM2.5 and O~3~ were obtained from CANUE data linked to participant postal codes [@canueDataPortal]. PM2.5 values are derived from satellite-based aerosol data combined with the GEOS-Chem chemical transport model and calibrated to ground-based observations. O~3~ represents a one-year average of ground-level concentrations modeled by Environment and Climate Change Canada using the CHRONOS model (2002–2009) and GEM-MACH model (2010–2024). As postal code-linked measures were not available for NO~2~ and SO~2~ for the baseline data collection period, one-year average concentrations (ppb) derived from National Air Pollution Surveillance (NAPS) monitoring stations within 50 km of each participant's postal code were used for both. 
+
+Tree canopy cover refers to the percentage of area covered by woody plants taller than 5 metres. Estimates were derived from Landsat satellite imagery at 30-metre resolution via Google Earth Engine for the years 2010 and 2015. The average was calculated by taking the percent tree canopy coverage value from each 30-metre resolution pixel within the buffer zone around a postal code, then averaging all those pixel values together to produce a single summary number for that area. Buffer zones were "at postal code" and 100, 250, 500, and 1000 metres around each postal code were calculated [@canueDataPortal].
+
+Vegetation greenness fraction represents the percentage of green vegetation detected within each 30x30 metre pixel, capturing all vegetation regardless of height (e.g. grass, shrubs, trees) as well as the density and lushness of that vegetation. Unlike tree canopy cover, which measures only woody vegetation taller than 5 metres, greenness fraction reflects all green vegetation but is also more susceptible to reduction by built environment features such as roads and buildings sharing the same pixel, even when located beneath tree canopy. Values were assigned to postal codes by calculating the mean and maximum greenness fraction within buffer zones of "at postal code", 100, 250, 500, and 1000 metres [@canueDataPortal].
+
+The Normalized Difference Vegetation Index (NDVI) is a satellite-derived measure of vegetation greenness, ranging from -1 to 1, where higher values indicate denser and healthier vegetation. Annual maximum NDVI was derived from Landsat 5 and Landsat 8 imagery via Google Earth Engine, where each pixel's value represents the greenest (highest NDVI) observation recorded across all satellite passes within that year. The variable used in this study (GRLANYY_26) represents the highest single NDVI value within a 500-metre buffer around each postal code, capturing the peak greenness of the most vegetated area nearby [@canueDataPortal].
+
+Condensation problems were assessed via a yes/no questionnaire item: "Does your current home have problems with condensation?"
+
+
+\newpage
+
+
+RESULTS
+
+Descriptive statistics by household income are shown in Table 1. The overall sample had a mean age of 63 years (SD = 10) and was 49% male. The largest income group was 50–100K (n = 458, 31%), followed by 20–50K (n = 364, 25%), 100–150K (n = 248, 17%), 150K+ (n = 235, 16%), <20K (n = 94, 6.4%), and Don't Know/No Answer/Refused (n = 79, 5.3%). Sex distribution varied by income, with higher income groups being more male-dominated (62% male in the 150K+ group) and lower income groups being slightly more female-dominated (56% female in the <20K group). The sample was predominantly White across all income groups (91–97%) based on self-reported cultural background. Ontario (21%), Quebec (20%), and British Columbia (21%) were the most represented provinces. New Brunswick, Prince Edward Island, and Saskatchewan had no representation in the sample.
+
+Regarding environmental exposures, PM2.5 was relatively consistent across income groups (mean 6.55–7.00 µg/m³), with slightly higher values in lower income groups. Ozone was also similar across groups (mean 24.6–25.8 ppb). NDVI was nearly identical across all income groups (mean 0.81–0.82). Housing condensation was notably more prevalent in lower income groups, with 16% of the <20K group reporting condensation compared to only 1.7% in the 150K+ group. It should be noted that the overall prevalence of housing condensation was low, with only 54 participants (3.9%) reporting condensation, which may limit the reliability of estimates across income groups.
+
+Tree canopy cover at the postal code level was highest in the 150K+ group (mean 18%) and lowest in the <20K group (mean 15%). Interestingly the group that did not answer had the lowest tree canopy cover with a mean of 12%. Mean tree canopy cover within 500m showed a similar pattern, with higher income groups having slightly higher coverage (mean 33% in 150K+ vs 28% in <20K). Vegetative greenness fraction at the postal code and within 500m showed less variation, with means ranging from 28–36% across income groups.
+
+
+Table 1 
+```{r table_demographics, echo=FALSE, out.width="100%"}
+knitr::include_graphics("Figures/table1.png")
+```
+
+
+
+
+\newpage
+
+
+# Income and Epigenetic Aging
+
+
+Associations between household income and epigenetic aging are shown in the following table. Income categories were assigned numeric values from 1 (highest, ≥150K) to 5 (lowest, <20K) and entered into the model as a continuous trend variable, such that a positive coefficient reflects greater epigenetic aging with decreasing income. For DNAmIC, which measures intrinsic capacity where higher values indicate better health, a negative coefficient instead reflects reduced intrinsic capacity with decreasing income. Due to a significant interaction between age and income (p < 0.001), the sample was stratified into two age groups for analysis.
+
+Among adults aged 45–64, lower income was associated with faster epigenetic aging across all four measures. Moving from the highest (≥150K) to the lowest (<20K) income category was associated with a GrimAge EAA that was 3.94 years higher (95% CI: 2.89, 4.98, p < 0.001), a PhenoAge EAA that was 1.83 years higher (95% CI: 0.28, 3.38, p < 0.05), and a DunedinPACE that was 0.08 faster (95% CI: 0.05, 0.11, p < 0.001). DNAmIC was also significantly lower among those with lower income (β = -4.37e-03, 95% CI: -7.97e-03, -7.73e-04, p < 0.05).
+
+Among adults aged 65–85, associations were similar in direction but attenuated. GrimAge EAA was 2.64 years higher (95% CI: 0.72, 4.57, p < 0.01) and DunedinPACE was 0.07 faster (95% CI: 0.01, 0.13, p < 0.05) moving from the highest to the lowest income category, while PhenoAge EAA and DNAmIC were no longer statistically significant.
+
+It should be noted that income categories were treated as equally spaced numeric steps in this analysis. However, the difference between adjacent income categories may not be equivalent. For example, the gap between <20K and 20–50K could have a different impact on health than the gap between 100–150K and 150K+. The assumption of equal spacing is a potential limitation of the trend analysis approach.
+
+
+<br>
+<br>
+
+```{r table_income, echo=FALSE, out.width="100%"}
+knitr::include_graphics("Figures/income_trend_table.png")
+```
+
+
+\newpage
+
+# Income and Environmental Exposures
+
+Associations between household income and environmental exposures are shown in the following table. In terms of air pollution, lower income was associated with higher PM2.5 concentrations (β = 0.517, 95% CI: 0.084, 0.951, p < 0.05), while ozone, NO₂, and SO₂ were not significantly associated with income. Lower income was also associated with significantly lower NDVI (β = -0.014, 95% CI: -0.023, -0.005, p < 0.01), and significantly higher odds of housing condensation (OR = 11.89, 95% CI: 3.29, 42.97, p < 0.001).
+
+Lower income was associated with less tree canopy cover. Moving from the highest to the lowest income category was associated with a reduction of 3.85 percentage points of tree canopy cover at the postal code level (95% CI: -6.345, -1.364, p < 0.01), with a similar reduction observed within 500m (β = -2.28, 95% CI: -3.779, -0.782, p < 0.01).
+
+Mean vegetative greenness fraction within 500m was also significantly lower among those with lower income (β = -4.311, 95% CI: -7.658, -0.964, p < 0.05), while the association at the postal code level was not statistically significant.
+
+<br>
+<br>
+
+
+```{r table_env_income, echo=FALSE, out.width="100%"}
+knitr::include_graphics("Figures/env_income_table.png")
+```
+
+
+\newpage
+
+# Environmental Exposures and Epigenetic aging
+
+Associations between environmental exposures and epigenetic aging are shown in the following table. With respect to air pollution, higher SO₂ concentrations were associated with accelerated GrimAge EAA (β = 0.36, 95% CI: 0.04, 0.69, p < 0.05) and PhenoAge EAA (β = 0.61, 95% CI: 0.16, 1.05, p < 0.01), as well as reduced DNAmIC (β = -1.25e-03, 95% CI: -2.45e-03, -4.41e-05, p < 0.05). PM2.5, ozone, and NO₂ were not significantly associated with any epigenetic aging measure.
+
+Housing condensation was associated with higher GrimAge EAA (β = 1.54, 95% CI: 0.59, 2.5, p < 0.01) and reduced DNAmIC (β = -3.80e-03, 95% CI: -7.37e-03, -2.26e-04, p < 0.05), but was not significantly associated with PhenoAge EAA or DunedinPACE.
+
+Higher NDVI (max within 500m) was associated with lower GrimAge EAA (β = -5.6, 95% CI: -10.74, -0.46, p < 0.05) and higher DNAmIC (β = 2.09e-02, 95% CI: 1.37e-03, 4.04e-02, p < 0.05). Tree canopy cover at the postal code level was significantly associated with higher DNAmIC only (β = 8.41e-05, 95% CI: 1.34e-06, 1.67e-04, p < 0.05), while mean tree canopy cover within 500m and vegetative greenness fraction were not significantly associated with any epigenetic aging outcome.
+
+<br>
+<br>
+
+
+
+```{r table_env_aging, echo=FALSE, out.width="100%"}
+knitr::include_graphics("Figures/env_aging_table.png")
+```
+
+
+
+
+
+\newpage
+
+# References
+
+

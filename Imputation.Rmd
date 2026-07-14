@@ -1,0 +1,1270 @@
+---
+title: "Imputation"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+date: "2026-05-20"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,       # hides code
+  message = FALSE,    # suppresses messages
+  warning = FALSE     # suppresses warnings
+)
+```
+
+
+What i've done so far: 
+i ran up to line 216 
+so now do diagnostics 
+
+
+# Missingness: Visualize overall missingness 
+
+Little's MCAR (missing completely at random) test was run to check whether missing data was random or patterned. The result (p < 0.001) means I can reject the null that the data are MCAR. This indicates that the missingness is not at random - so the missingness depends on variables we have observed, not some unobserved factor. It is appropriate to use MICE because the data is MAR. 
+
+
+Who is missing data with the air pollution measures? 528 people out of 1478 (36%) would be dropped if I did complete case on all pollution variables. That is too many cases to drop. 
+
+PM2.5
+Province 3: 65% missing — MICE only has 55 observed values to learn the PM2.5 distribution for that province
+Province 7: 35% missing — MICE has 200 observed values but 109 are missing
+
+NO2:
+The people missing NO2 are different people than those missing PM2.5.
+Province 6: 58 missing out of 152 (~38% missing)
+Province 9: 153 missing out of 295 (~52% missing)
+
+
+```{r}
+## ============= Observe Missing Data Patterns =============
+
+#install.packages("VIM")
+#install.packages("naniar")
+library(VIM)
+library(naniar)
+library(DataExplorer)
+library(mice)
+library(dplyr)
+
+# Quick overview of all missing data
+colSums(is.na(subset_data))
+
+# Visual overview of missingness across all variables
+DataExplorer::plot_missing(subset_data)
+
+#MCAR test - is the data MCAR? (don't want that)
+mcar_test(subset_data[, !names(subset_data) %in% c("entity_id.x")])
+
+md.pattern(subset_data)
+aggr(subset_data, numbers = TRUE, sortVars = TRUE, cex.axis = 0.7)
+colSums(is.na(subset_data))   # count of NAs per variable
+
+
+```
+
+
+
+
+```{r}
+# look at characteristics of people missing vs not missing pm25
+subset_data %>%
+  mutate(missing_pm25 = is.na(pm25_1yr_com)) %>%
+  group_by(missing_pm25) %>%
+  summarise(
+    n = n(),
+    mean_age = mean(AGE_NMBR_COM, na.rm = TRUE),
+    mean_income = mean(as.numeric(INC_TOT_COM), na.rm = TRUE))
+
+
+
+subset_data %>%
+  mutate(missing_pm25 = is.na(pm25_1yr_com)) %>%
+  group_by(missing_pm25) %>%
+  summarise(
+    n = n(),
+    mean_age = mean(AGE_NMBR_COM, na.rm = TRUE),
+    mean_income = mean(as.numeric(INC_TOT_COM), na.rm = TRUE),
+    pct_male = mean(SEX_ASK_COM == 1, na.rm = TRUE),  # adjust coding if needed
+    mean_pm25 = mean(pm25_1yr_com, na.rm = TRUE),
+    pct_race_white = mean(Race7 == 1, na.rm = TRUE))  # adjust coding if needed
+
+
+#check which PM2.5 are missing (by province)
+subset_data %>%
+  mutate(missing_pm25 = is.na(pm25_1yr_com)) %>%
+  group_by(WGHTS_PROV_COM, missing_pm25) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = missing_pm25, values_from = n)
+
+
+
+#check which NO2 are missing (by province) - they are different than the PM2.5
+subset_data %>%
+  mutate(missing_pm25 = is.na(so2_1yr_com)) %>%
+  group_by(WGHTS_PROV_COM, missing_pm25) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = missing_pm25, values_from = n)
+
+
+#check how many total missing across all the air pollution variables (528!)
+subset_data %>%
+  mutate(missing_any = is.na(pm25_1yr_com) | is.na(no2_1yr_com) | 
+           is.na(so2_1yr_com) | is.na(o3_1yr_com)) %>%
+  count(missing_any)
+
+
+
+#check if tree canopy coverage has the same provincial missingness pattern:
+#province 5 has no tree canopy data! (112 missing) 
+subset_data %>%
+  mutate(missing_pm25 = is.na(grtcc10_01_COM)) %>%
+  group_by(WGHTS_PROV_COM, missing_pm25) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = missing_pm25, values_from = n)
+
+#check if %veg has same provincial missingness - no, it doesn't. it's pretty spread out. 
+subset_data %>%
+  mutate(missing_pm25 = is.na(GRUMPYY_04_COM)) %>%
+  group_by(WGHTS_PROV_COM, missing_pm25) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = missing_pm25, values_from = n)
+
+
+#check if condensation has same provincial missingness - no, it doesn't. it's pretty spread out. 
+subset_data %>%
+  mutate(missing_pm25 = is.na(ENV_HMPRB_CON_MCQ)) %>%
+  group_by(WGHTS_PROV_COM, missing_pm25) %>%
+  summarise(n = n()) %>%
+  pivot_wider(names_from = missing_pm25, values_from = n)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Imputation 1 
+
+```{r}
+
+###############################################
+### Predictor matrix
+###############################################
+
+pred <- make.predictorMatrix(subset_data)
+
+# Don't impute these
+pred["entity_id.x", ] <- 0
+pred[c("AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7"), ] <- 0
+pred[c("CD4nv","CD8nv","Mono","Treg","CD4mem","CD8mem","NK","Bmem","Bnv"), ] <- 0
+pred[c("GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC"), ] <- 0  
+
+# Don't allow entity id to be a predictor
+pred[, "entity_id.x"] <- 0
+
+# Allow these to be predictors
+pred[, c("AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7")] <- 1
+pred[, "INC_TOT_COM"] <- 1
+pred[, c("CD4nv","CD8nv","Mono","Treg","CD4mem","CD8mem","NK","Bmem","Bnv")] <- 1
+pred[, c("GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC")] <- 1
+
+# Let all exposures with missingness predict each other
+exposures <- c(
+  "PM25DALYY_01_COM", "O3CHGYY_01_COM", "no2_1yr_com", "so2_1yr_com",
+  "ENV_HMPRB_CON_MCQ",
+  "grtcc10_01_COM", "grtcc10_04_COM", "GRUMPYY_01_COM", "GRUMPYY_04_COM",
+  "GRLANYY_26_COM",  
+  "PA2_DSCR2_MCQ", "ALC_FREQ_COM", "ICQ_SMOKE_COM",
+  "INC_TOT_COM"
+)
+pred[exposures, exposures] <- 1
+diag(pred) <- 0
+
+###############################################
+### Imputation methods
+###############################################
+
+meth <- make.method(subset_data)
+
+# Continuous variables → predictive mean matching (pmm)
+meth[c("PM25DALYY_01_COM", "O3CHGYY_01_COM", "no2_1yr_com", "so2_1yr_com",
+       "grtcc10_01_COM", "grtcc10_04_COM", "GRUMPYY_01_COM", "GRUMPYY_04_COM",
+       "GRLANYY_26_COM", "PA2_DSCR2_MCQ")] <- "pmm"
+
+# Binary categorical variable → logistic regression
+meth["ENV_HMPRB_CON_MCQ"] <- "logreg"
+
+# Ordered categorical variable → proportional odds/ordinal regression
+meth["ALC_FREQ_COM"] <- "polr"
+
+# Unordered categorical variables (3+ levels) → polytomous regression
+meth[c("INC_TOT_COM", "ICQ_SMOKE_COM")] <- "polyreg"
+
+###############################################
+### Run MICE
+###############################################
+
+imp <- mice(subset_data, m = 20, maxit = 30, method = meth,
+            predictorMatrix = pred, seed = 123)
+
+dir.create("ImputedDatasets", showWarnings = FALSE)
+save(imp, file = "ImputedDatasets/imp_data_baseline.RData")
+
+```
+
+
+
+# Imputation 2: 
+
+Increasing donors (5→10) helped one variable (grtcc10_01_COM). Log-transforming didn't help the others at all. 
+
+
+```{r}
+###############################################
+### Predictor matrix
+###############################################
+pred <- make.predictorMatrix(subset_data)
+
+# Don't impute these
+pred["entity_id.x", ] <- 0
+pred[c("AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7"), ] <- 0
+pred[c("CD4nv","CD8nv","Mono","Treg","CD4mem","CD8mem","NK","Bmem","Bnv"), ] <- 0
+pred[c("GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC"), ] <- 0  
+
+# Don't allow entity id to be a predictor
+pred[, "entity_id.x"] <- 0
+
+# Allow these to be predictors
+pred[, c("AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7")] <- 1
+pred[, "INC_TOT_COM"] <- 1
+pred[, c("CD4nv","CD8nv","Mono","Treg","CD4mem","CD8mem","NK","Bmem","Bnv")] <- 1
+pred[, c("GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC")] <- 1
+
+# Let all exposures with missingness predict each other
+exposures <- c(
+  "PM25DALYY_01_COM", "O3CHGYY_01_COM", "no2_1yr_com", "so2_1yr_com",
+  "ENV_HMPRB_CON_MCQ",
+  "grtcc10_01_COM", "grtcc10_04_COM", "GRUMPYY_01_COM", "GRUMPYY_04_COM",
+  "GRLANYY_26_COM",  
+  "PA2_DSCR2_MCQ", "ALC_FREQ_COM", "ICQ_SMOKE_COM",
+  "INC_TOT_COM"
+)
+pred[exposures, exposures] <- 1
+diag(pred) <- 0
+
+
+###############################################
+### Imputation methods
+###############################################
+meth <- make.method(subset_data)
+
+# Continuous variables → predictive mean matching (pmm)
+meth[c("PM25DALYY_01_COM", "O3CHGYY_01_COM", "no2_1yr_com", "so2_1yr_com",
+       "grtcc10_01_COM", "grtcc10_04_COM", "GRUMPYY_01_COM", "GRUMPYY_04_COM",
+       "GRLANYY_26_COM", "PA2_DSCR2_MCQ")] <- "pmm"
+
+# Binary categorical variable → logistic regression
+meth["ENV_HMPRB_CON_MCQ"] <- "logreg"
+
+# Ordered categorical variable → proportional odds/ordinal regression
+meth["ALC_FREQ_COM"] <- "polr"
+
+# Unordered categorical variables (3+ levels) → polytomous regression
+meth[c("INC_TOT_COM", "ICQ_SMOKE_COM")] <- "polyreg"
+
+
+###############################################
+### Run MICE (donors increased from default 5 to 10)
+###############################################
+imp2 <- mice(subset_data, m = 20, maxit = 30, method = meth,
+             predictorMatrix = pred, seed = 123, donors = 10)
+
+dir.create("ImputedDatasets", showWarnings = FALSE)
+save(imp2, file = "ImputedDatasets/imp_data_baseline_v2.RData")
+
+
+###############################################
+### Check diagnostics
+###############################################
+plot(imp2)                        # convergence
+stripplot(imp2, pch = 20, cex = 1.2)
+densityplot(imp2)
+```
+
+# Notes 
+
+## Diagnostics 
+
+Convergence: The number of iterations was increased to 30 (m = 20) after checking the convergence plots. At this setting, the trace plots looked random with no obvious pattern, indicating the imputations had converged.
+
+Stripplots were produced to check if the imputed values look plausible. I checked multiple predictors to see if the imputed data looks plausible. 
+
+I found that some of the plots looked problematic, so did further diagnostics to see if the imputed values are still plausible though the strip plots look possibly concerning. 
+
+1. GRLANYY_26_COM (NDVI/greenness): skewed variable with very few observed values near its upper bound (only 2 of 1,478 cases at the maximum). Because of this sparse donor pool, predictive mean matching is unlikely to impute values close to the maximum, even for missing cases that might genuinely belong there. This is a data limitation rather than a modeling error, and its impact is likely minor given the small proportion of missing data for this variable (~5%).
+
+I also checked if missing greenness (NDVI) data was concentrated in any particular income group. Missingness was spread fairly evenly across all income brackets, with no group standing out. This supports the earlier conclusion that the limited imputation range for this variable is due to a shortage of high-greenness observations in the data overall, not a bias related to income or another predictor.
+
+2. SO2: The imputed values could be underestimates - people missing SO2 data had other pollution markers e.g. NO2 that looked like they should be high SO2 people but the imputed values stayed low. The reason: Observed high-SO2 values only occur in Ontario in the data. Most of the missing SO2 values were for people in other provinces, so imputed values weren't high levels, even though a few of those people had other pollution markers that looked similar to the high-SO2 group in Ontario. In conclusion, we can't be fully confident the filled-in values are accurate for people outside of Ontario. I checked whether income might explain the pattern instead, but it didn't — the high-SO2 group was spread evenly across income levels, while province clearly wasn't. This supports province as the most likely driver. 
+
+3. NO2: The people missing NO2 data have PM2.5 levels that look like the low-NO2 group, not the high one, so it's consistent that they got imputed as low/mid. Also, the province with high NO2 (Alberta) doesn't have any missing NO2 data at all, so we wouldn't have to impute high values anyway. 
+ 
+
+```{r}
+
+###############################################
+### Diagnostics
+###############################################
+
+load("ImputedDatasets/imp_data_baseline.RData")
+
+plot(imp)                        # check convergence first
+stripplot(imp, pch = 20, cex = 1.2)
+densityplot(imp)
+densityplot(imp2)
+
+# Extract completed datasets
+imp_long <- complete(imp, action = "long", include = TRUE)
+completed_list <- lapply(1:20, function(i) complete(imp, i))
+
+# Confirm no NAs remain in imputed variables
+colSums(sapply(completed_list[[1]], is.na))
+```
+
+
+```{r}
+# Check imputation methods for these variables
+imp$method[c("PM25DALYY_01_COM", "grtcc10_01_COM", "grtcc10_04_COM", 
+             "GRUMPYY_01_COM", "GRUMPYY_04_COM")]
+
+
+
+# 1. Check % missing for each variable
+sapply(c("PM25DALYY_01_COM", "grtcc10_01_COM", "grtcc10_04_COM",
+         "GRUMPYY_01_COM", "GRUMPYY_04_COM"),
+       function(v) mean(is.na(subset_data[[v]])))
+
+# 2. Check how many predictors are actually being used for each
+sapply(c("PM25DALYY_01_COM", "grtcc10_01_COM", "grtcc10_04_COM",
+         "GRUMPYY_01_COM", "GRUMPYY_04_COM"),
+       function(v) sum(imp$predictorMatrix[v, ]))
+
+# 3. Fit a quick complete-case regression to see how much variance predictors explain
+# (rough proxy for what pmm's internal model sees)
+for (v in c("PM25DALYY_01_COM", "grtcc10_01_COM", "grtcc10_04_COM",
+            "GRUMPYY_01_COM", "GRUMPYY_04_COM")) {
+  preds <- names(which(imp$predictorMatrix[v, ] == 1))
+  f <- as.formula(paste(v, "~", paste(preds, collapse = " + ")))
+  fit <- lm(f, data = subset_data)
+  cat(v, "- R-squared:", summary(fit)$r.squared, "\n")
+}
+
+
+
+# Look at the actual shape of each variable to confirm multimodality
+hist(subset_data$PM25DALYY_01_COM, breaks = 30)
+hist(subset_data$grtcc10_01_COM, breaks = 30)
+hist(subset_data$grtcc10_04_COM, breaks = 30)
+hist(subset_data$GRUMPYY_01_COM, breaks = 30)
+hist(subset_data$GRUMPYY_04_COM, breaks = 30)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Individual variable checks (based on strip plots)
+
+
+```{r}
+#check distribution of NDVI 
+
+#after viewing strip plots:
+#look into variables more 
+str(subset_data$GRLANYY_26_COM)
+summary(subset_data$GRLANYY_26_COM)
+
+sum(subset_data$GRLANYY_26_COM == 1, na.rm = TRUE)
+mean(subset_data$GRLANYY_26_COM == 1, na.rm = TRUE)
+hist(subset_data$GRLANYY_26_COM, breaks = 30)
+
+#so2
+str(subset_data$so2_1yr_com)
+summary(subset_data$so2_1yr_com)
+
+hist(subset_data$so2_1yr_com, breaks = 30)
+
+
+```
+
+
+## checking SO2 and NO2 with PM2.5 and other environmental variables. 
+
+```{r}
+#check SO2 
+
+library(dplyr)
+library(ggplot2)
+
+# ---- 1. Identify key groups ----
+missing_idx       <- which(is.na(subset_data$so2_1yr_com))
+high_cluster_idx  <- which(subset_data$so2_1yr_com > 2.5)
+low_mid_idx       <- which(subset_data$so2_1yr_com <= 2.5)
+
+cat("Missing cases:", length(missing_idx), "\n")
+cat("Observed high-cluster cases:", length(high_cluster_idx), "\n")
+cat("Observed low/mid-cluster cases:", length(low_mid_idx), "\n")
+
+# ---- 2. Predictor variables to compare ----
+# Uses your actual exposures + province (your only geographic variable)
+compare_vars <- c("WGHTS_PROV_COM", "PM25DALYY_01_COM", "no2_1yr_com",
+                   "O3CHGYY_01_COM", "ENV_HMPRB_CON_MCQ",
+                   "AGE_NMBR_COM", "SEX_ASK_COM", "INC_TOT_COM")
+
+# ---- 3. Build group labels ----
+subset_data <- subset_data %>%
+  mutate(row_id = row_number(),
+         so2_group = case_when(
+           row_id %in% high_cluster_idx ~ "Observed HIGH so2",
+           row_id %in% low_mid_idx      ~ "Observed LOW/MID so2",
+           row_id %in% missing_idx      ~ "Missing so2",
+           TRUE ~ NA_character_
+         ))
+
+
+# ---- 4. Numeric predictor summary by group ----
+numeric_vars <- c("PM25DALYY_01_COM", "no2_1yr_com", "O3CHGYY_01_COM",
+                   "AGE_NMBR_COM")   # removed INC_TOT_COM — it's categorical
+
+subset_data %>%
+  filter(!is.na(so2_group)) %>%
+  group_by(so2_group) %>%
+  summarise(across(all_of(numeric_vars),
+                    list(mean = ~mean(.x, na.rm = TRUE),
+                         sd   = ~sd(.x, na.rm = TRUE)),
+                    .names = "{.col}_{.fn}"),
+            n = n())
+
+# ---- 4b. INC_TOT_COM distribution by group (categorical) ----
+subset_data %>%
+  filter(!is.na(so2_group)) %>%
+  count(so2_group, INC_TOT_COM) %>%
+  group_by(so2_group) %>%
+  mutate(pct = n / sum(n) * 100) %>%
+  arrange(so2_group, desc(pct))
+
+# ---- 5. Province distribution by group (categorical) ----
+subset_data %>%
+  filter(!is.na(so2_group)) %>%
+  count(so2_group, WGHTS_PROV_COM) %>%
+  group_by(so2_group) %>%
+  mutate(pct = n / sum(n) * 100) %>%
+  arrange(so2_group, desc(pct))
+
+
+
+# ---- 6. Look at individual missing cases directly ----
+# Use the actual row numbers you saw in imp$imp$so2_1yr_com output
+example_rows <- c(3, 17, 44, 45, 64)
+
+subset_data[example_rows, c("entity_id.x", compare_vars)]
+
+# Compare against a random sample of observed high/low individuals
+set.seed(1)
+subset_data[sample(high_cluster_idx, 10), c("entity_id.x", "so2_1yr_com", compare_vars)]
+subset_data[sample(low_mid_idx, 10), c("entity_id.x", "so2_1yr_com", compare_vars)]
+
+# ---- 7. Visual comparisons ----
+
+# Continuous pollutant predictors
+ggplot(subset_data %>% filter(!is.na(so2_group)),
+       aes(x = so2_group, y = PM25DALYY_01_COM, fill = so2_group)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "PM2.5 by SO2 group")
+
+ggplot(subset_data %>% filter(!is.na(so2_group)),
+       aes(x = so2_group, y = no2_1yr_com, fill = so2_group)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "NO2 by SO2 group")
+
+# Province — categorical, so use a proportion bar chart
+ggplot(subset_data %>% filter(!is.na(so2_group)),
+       aes(x = WGHTS_PROV_COM, fill = so2_group)) +
+  geom_bar(position = "fill") +
+  theme_minimal() +
+  labs(title = "Province distribution by SO2 group", y = "Proportion") +
+  coord_flip()
+
+# ---- 8. Clean up helper column ----
+subset_data$row_id <- NULL
+       
+```
+
+```{r}
+
+#Check NO2 
+
+
+# Basic distribution
+str(subset_data$no2_1yr_com)
+summary(subset_data$no2_1yr_com)
+hist(subset_data$no2_1yr_com, breaks = 30)
+
+# Missingness
+sum(is.na(subset_data$no2_1yr_com))
+mean(is.na(subset_data$no2_1yr_com))
+
+# Imputation method + predictors actually used
+imp$method["no2_1yr_com"]
+imp$predictorMatrix["no2_1yr_com", ]
+
+# Look at actual imputed values
+imp$imp$no2_1yr_com
+
+
+
+# Check percentile cutoffs to pick a sensible "high" threshold
+quantile(subset_data$no2_1yr_com, probs = c(0.75, 0.85, 0.90, 0.95), na.rm = TRUE)
+
+# How many observed cases would count as "high" at a few candidate cutoffs
+sum(subset_data$no2_1yr_com > 11, na.rm = TRUE)
+sum(subset_data$no2_1yr_com > 12, na.rm = TRUE)
+sum(subset_data$no2_1yr_com > 13, na.rm = TRUE)
+
+
+
+library(dplyr)
+library(ggplot2)
+
+# ---- Define groups ----
+no2_missing_idx <- which(is.na(subset_data$no2_1yr_com))
+no2_high_idx    <- which(subset_data$no2_1yr_com > 12)
+no2_low_idx     <- which(subset_data$no2_1yr_com <= 12)
+
+cat("Missing NO2 cases:", length(no2_missing_idx), "\n")
+cat("Observed HIGH NO2 cases:", length(no2_high_idx), "\n")
+cat("Observed LOW/MID NO2 cases:", length(no2_low_idx), "\n")
+
+subset_data <- subset_data %>%
+  mutate(row_id = row_number(),
+         no2_group = case_when(
+           row_id %in% no2_high_idx    ~ "Observed HIGH no2",
+           row_id %in% no2_low_idx     ~ "Observed LOW/MID no2",
+           row_id %in% no2_missing_idx ~ "Missing no2",
+           TRUE ~ NA_character_
+         ))
+
+# ---- Numeric predictor comparison ----
+numeric_vars <- c("PM25DALYY_01_COM", "so2_1yr_com", "O3CHGYY_01_COM", "AGE_NMBR_COM")
+
+subset_data %>%
+  filter(!is.na(no2_group)) %>%
+  group_by(no2_group) %>%
+  summarise(across(all_of(numeric_vars),
+                    list(mean = ~mean(.x, na.rm = TRUE),
+                         sd   = ~sd(.x, na.rm = TRUE)),
+                    .names = "{.col}_{.fn}"),
+            n = n())
+
+# ---- Province distribution by group ----
+subset_data %>%
+  filter(!is.na(no2_group)) %>%
+  count(no2_group, WGHTS_PROV_COM) %>%
+  group_by(no2_group) %>%
+  mutate(pct = n / sum(n) * 100) %>%
+  arrange(no2_group, desc(pct))
+
+# ---- Visual checks ----
+ggplot(subset_data %>% filter(!is.na(no2_group)),
+       aes(x = no2_group, y = PM25DALYY_01_COM, fill = no2_group)) +
+  geom_boxplot() + theme_minimal() + labs(title = "PM2.5 by NO2 group")
+
+ggplot(subset_data %>% filter(!is.na(no2_group)),
+       aes(x = no2_group, y = so2_1yr_com, fill = no2_group)) +
+  geom_boxplot() + theme_minimal() + labs(title = "SO2 by NO2 group")
+
+ggplot(subset_data %>% filter(!is.na(no2_group)),
+       aes(x = WGHTS_PROV_COM, fill = no2_group)) +
+  geom_bar(position = "fill") + theme_minimal() +
+  labs(title = "Province distribution by NO2 group", y = "Proportion") +
+  coord_flip()
+
+# ---- Check actual imputed values for NO2 ----
+imp$imp$no2_1yr_com
+
+# ---- Predictor matrix used for NO2 ----
+imp$predictorMatrix["no2_1yr_com", ]
+
+# ---- Clean up ----
+subset_data$row_id <- NULL
+
+```
+
+
+
+## checking GRLANNY, SO2 and NO2 with income 
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# ---- Define groups for GRLANYY_26_COM ----
+# Using 0.95 as a reasonable "high" cutoff based on earlier discussion — adjust if needed
+grlanyy_missing_idx <- which(is.na(subset_data$GRLANYY_26_COM))
+grlanyy_high_idx     <- which(subset_data$GRLANYY_26_COM > 0.95)
+grlanyy_low_idx      <- which(subset_data$GRLANYY_26_COM <= 0.95)
+
+cat("Missing GRLANYY_26_COM cases:", length(grlanyy_missing_idx), "\n")
+cat("Observed HIGH cases (>0.95):", length(grlanyy_high_idx), "\n")
+cat("Observed LOW/MID cases:", length(grlanyy_low_idx), "\n")
+
+subset_data <- subset_data %>%
+  mutate(row_id = row_number(),
+         grlanyy_group = case_when(
+           row_id %in% grlanyy_high_idx    ~ "Observed HIGH GRLANYY",
+           row_id %in% grlanyy_low_idx     ~ "Observed LOW/MID GRLANYY",
+           row_id %in% grlanyy_missing_idx ~ "Missing GRLANYY",
+           TRUE ~ NA_character_
+         ))
+
+# ---- Income distribution by group (categorical) ----
+subset_data %>%
+  filter(!is.na(grlanyy_group)) %>%
+  count(grlanyy_group, INC_TOT_COM) %>%
+  group_by(grlanyy_group) %>%
+  mutate(pct = n / sum(n) * 100) %>%
+  arrange(grlanyy_group, desc(pct))
+
+# ---- Visual: income distribution by group ----
+ggplot(subset_data %>% filter(!is.na(grlanyy_group)),
+       aes(x = INC_TOT_COM, fill = grlanyy_group)) +
+  geom_bar(position = "fill") +
+  theme_minimal() +
+  labs(title = "Income distribution by GRLANYY (greenness) group", y = "Proportion") +
+  coord_flip()
+
+# ---- Clean up ----
+subset_data$row_id <- NULL
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# ---- Define groups for SO2 (using cutoff from earlier: >2.5 = high) ----
+so2_missing_idx <- which(is.na(subset_data$so2_1yr_com))
+so2_high_idx    <- which(subset_data$so2_1yr_com > 2.5)
+so2_low_idx     <- which(subset_data$so2_1yr_com <= 2.5)
+
+subset_data <- subset_data %>%
+  mutate(row_id = row_number(),
+         so2_group = case_when(
+           row_id %in% so2_high_idx    ~ "Observed HIGH so2",
+           row_id %in% so2_low_idx     ~ "Observed LOW/MID so2",
+           row_id %in% so2_missing_idx ~ "Missing so2",
+           TRUE ~ NA_character_
+         ))
+
+# ---- Income distribution by group (categorical) ----
+subset_data %>%
+  filter(!is.na(so2_group)) %>%
+  count(so2_group, INC_TOT_COM) %>%
+  group_by(so2_group) %>%
+  mutate(pct = n / sum(n) * 100) %>%
+  arrange(so2_group, desc(pct))
+
+# ---- Visual: income distribution by group ----
+ggplot(subset_data %>% filter(!is.na(so2_group)),
+       aes(x = INC_TOT_COM, fill = so2_group)) +
+  geom_bar(position = "fill") +
+  theme_minimal() +
+  labs(title = "Income distribution by SO2 group", y = "Proportion") +
+  coord_flip()
+
+# ---- Clean up ----
+subset_data$row_id <- NULL
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Plot() plots the trace lines (trace plots). On convergence, the streams should intermingle and be free of any trend.
+https://cran.r-project.org/web/packages/mice/refman/mice.html
+
+Strip plot shows ... 
+
+use the stuff below under deleted to have density plots 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Imputation 3: log transforming PM25DALYY_01_COM, "grtcc10_04_COM", "GRUMPYY_01_COM", "GRUMPYY_04_COM"
+
+Log transformation of skewed variables: Some variables were skewed, so I tried log transforming them. After, the imputed values were still too clustered together, even on the log scale. So the imputed values are probably a bit conservative i.e. not capturing the full range of very high or very low values existing in the data. This is a known limitation of the imputation method itself, so I will keep the simpler, non-log version for final imputation.
+
+```{r}
+###############################################
+### STEP 1: Build your original predictor matrix
+### (exactly as you had it before any log-transform stuff)
+###############################################
+
+pred <- make.predictorMatrix(subset_data)
+
+# Don't impute these
+pred["entity_id.x", ] <- 0
+pred[c("AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7"), ] <- 0
+pred[c("CD4nv","CD8nv","Mono","Treg","CD4mem","CD8mem","NK","Bmem","Bnv"), ] <- 0
+pred[c("GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC"), ] <- 0  
+
+# Don't allow entity id to be a predictor
+pred[, "entity_id.x"] <- 0
+
+# Allow these to be predictors
+pred[, c("AGE_NMBR_COM", "SEX_ASK_COM", "WGHTS_PROV_COM", "Race7")] <- 1
+pred[, "INC_TOT_COM"] <- 1
+pred[, c("CD4nv","CD8nv","Mono","Treg","CD4mem","CD8mem","NK","Bmem","Bnv")] <- 1
+pred[, c("GrimAge_EAA", "PhenoAge_EAA", "DunedinPACE", "DNAmIC")] <- 1
+
+# Let all exposures with missingness predict each other
+exposures <- c(
+  "PM25DALYY_01_COM", "O3CHGYY_01_COM", "no2_1yr_com", "so2_1yr_com",
+  "ENV_HMPRB_CON_MCQ",
+  "grtcc10_01_COM", "grtcc10_04_COM", "GRUMPYY_01_COM", "GRUMPYY_04_COM",
+  "GRLANYY_26_COM",  
+  "PA2_DSCR2_MCQ", "ALC_FREQ_COM", "ICQ_SMOKE_COM",
+  "INC_TOT_COM"
+)
+pred[exposures, exposures] <- 1
+diag(pred) <- 0
+
+
+###############################################
+### STEP 2: Build your original imputation methods
+###############################################
+
+meth <- make.method(subset_data)
+
+meth[c("PM25DALYY_01_COM", "O3CHGYY_01_COM", "no2_1yr_com", "so2_1yr_com",
+       "grtcc10_01_COM", "grtcc10_04_COM", "GRUMPYY_01_COM", "GRUMPYY_04_COM",
+       "GRLANYY_26_COM", "PA2_DSCR2_MCQ")] <- "pmm"
+meth["ENV_HMPRB_CON_MCQ"] <- "logreg"
+meth["ALC_FREQ_COM"] <- "polr"
+meth[c("INC_TOT_COM", "ICQ_SMOKE_COM")] <- "polyreg"
+
+
+###############################################
+### STEP 3: Create log-transformed columns CORRECTLY
+### (real log value where raw is observed, NA only where raw is missing)
+###############################################
+
+# Safety check: confirm no zeros/negatives (log breaks on these)
+sapply(c("PM25DALYY_01_COM", "grtcc10_04_COM", "GRUMPYY_01_COM", "GRUMPYY_04_COM"),
+       function(v) sum(subset_data[[v]] <= 0, na.rm = TRUE))
+
+subset_data <- subset_data %>%
+  mutate(
+    log_PM25DALYY_01_COM = ifelse(is.na(PM25DALYY_01_COM), NA_real_, log(PM25DALYY_01_COM)),
+    log_grtcc10_04_COM   = ifelse(is.na(grtcc10_04_COM), NA_real_, log(grtcc10_04_COM)),
+    log_GRUMPYY_01_COM   = ifelse(is.na(GRUMPYY_01_COM), NA_real_, log(GRUMPYY_01_COM)),
+    log_GRUMPYY_04_COM   = ifelse(is.na(GRUMPYY_04_COM), NA_real_, log(GRUMPYY_04_COM))
+  )
+
+
+###############################################
+### STEP 4: Rebuild pred/meth so they include the new log columns,
+### while keeping ALL your original settings from Steps 1-2
+###############################################
+
+# Dry run just to get correctly-sized template matrices (now that log columns exist)
+ini <- mice(subset_data, maxit = 0, print = FALSE)
+pred_new <- ini$predictorMatrix
+meth_new <- ini$method
+
+# Copy your original custom settings into the new, correctly-sized objects
+old_vars <- rownames(pred)   # the variable names that existed BEFORE the log columns
+pred_new[old_vars, old_vars] <- pred[old_vars, old_vars]
+meth_new[old_vars] <- meth[old_vars]
+
+pred <- pred_new
+meth <- meth_new
+
+
+###############################################
+### STEP 5: Set passive imputation formulas for the log variables
+###############################################
+
+meth["log_PM25DALYY_01_COM"] <- "~log(PM25DALYY_01_COM)"
+meth["log_grtcc10_04_COM"]   <- "~log(grtcc10_04_COM)"
+meth["log_GRUMPYY_01_COM"]   <- "~log(GRUMPYY_01_COM)"
+meth["log_GRUMPYY_04_COM"]   <- "~log(GRUMPYY_04_COM)"
+
+# Raw variables stay pmm (confirming, in case anything got overwritten)
+meth["PM25DALYY_01_COM"] <- "pmm"
+meth["grtcc10_04_COM"]   <- "pmm"
+meth["GRUMPYY_01_COM"]   <- "pmm"
+meth["GRUMPYY_04_COM"]   <- "pmm"
+
+
+###############################################
+### STEP 6: Predictor matrix adjustments for log variables
+### (must run AFTER Step 1's "exposures" block, so it correctly overrides it)
+###############################################
+
+raw_log_pairs <- list(
+  c("PM25DALYY_01_COM", "log_PM25DALYY_01_COM"),
+  c("grtcc10_04_COM",   "log_grtcc10_04_COM"),
+  c("GRUMPYY_01_COM",   "log_GRUMPYY_01_COM"),
+  c("GRUMPYY_04_COM",   "log_GRUMPYY_04_COM")
+)
+
+# Don't let a raw variable and its own log twin predict each other
+for (pair in raw_log_pairs) {
+  pred[pair[1], pair[2]] <- 0
+  pred[pair[2], pair[1]] <- 0
+}
+
+log_vars <- c("log_PM25DALYY_01_COM", "log_grtcc10_04_COM",
+              "log_GRUMPYY_01_COM", "log_GRUMPYY_04_COM")
+raw_vars <- c("PM25DALYY_01_COM", "grtcc10_04_COM",
+              "GRUMPYY_01_COM", "GRUMPYY_04_COM")
+
+# Use log versions (not raw versions) as predictors for other variables
+pred[, raw_vars] <- 0
+pred[, log_vars] <- 1
+
+# Final safety checks
+pred[, "entity_id.x"] <- 0
+diag(pred) <- 0
+
+
+###############################################
+### STEP 7: Run MICE
+###############################################
+
+imp3 <- mice(subset_data, m = 20, maxit = 30, method = meth,
+             predictorMatrix = pred, seed = 123, donors = 10)
+
+dir.create("ImputedDatasets", showWarnings = FALSE)
+save(imp3, file = "ImputedDatasets/imp_data_baseline_v3.RData")
+
+
+###############################################
+### STEP 8: Check diagnostics
+###############################################
+
+# Convergence check
+plot(imp3)
+
+# Strip plots (observed vs imputed points)
+stripplot(imp3, pch = 20, cex = 1.2)
+
+# Density plots for the RAW variables (the ones that matter most)
+densityplot(imp3)
+
+# Density plots for the LOG variables specifically (should now work, no more error)
+densityplot(imp3, ~log_PM25DALYY_01_COM + log_grtcc10_04_COM + 
+                   log_GRUMPYY_01_COM + log_GRUMPYY_04_COM)
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Delete this 
+
+
+set pred
+make sure certain variables don't predict each other 
+think about which variables should be used to predict the others... 
+multi imp=true. make sure it's looking at all of the datasets. 
+do diagnostics after to make sure that the values look stable. bwplot (in keenan's code)
+
+
+
+
+2 check missingness in each variable within subset 
+
+Notes on province and PM2.5:
+Province 3: 101 missing out of 156 total (~65% missing)
+Province 7: 109 missing out of 309 total (~35% missing)
+
+
+```{r}
+library(mice)
+install.packages("DataExplorer")
+library(DataExplorer)
+plot_missing(subset_data)
+md.pattern(subset_data)
+
+
+colSums(is.na(subset_data)) #how many NAs for each variable 
+
+```
+
+
+3 what are the types of variables? 
+
+```{r}
+#what class are the variables 
+data.frame(
+  variable = names(subset_data),
+  class = sapply(subset_data, class),
+  n_unique = sapply(subset_data, function(x) length(unique(x))),
+  n_missing = sapply(subset_data, function(x) sum(is.na(x)))
+)
+
+#change categorical variables into factors, not integers 
+subset_data$SEX_ASK_COM <- as.factor(subset_data$SEX_ASK_COM)
+subset_data$WGHTS_PROV_COM <- as.factor(subset_data$WGHTS_PROV_COM)
+subset_data$ENV_HMPRB_CON_MCQ <- as.factor(subset_data$ENV_HMPRB_CON_MCQ)
+subset_data$ALC_FREQ_COM <- as.ordered(subset_data$ALC_FREQ_COM)
+subset_data$ICQ_SMOKE_COM <- as.factor(subset_data$ICQ_SMOKE_COM)
+subset_data$INC_TOT_COM <- as.ordered(subset_data$INC_TOT_COM)
+
+#check that it worked 
+data.frame(
+  variable = names(subset_data),
+  class = sapply(subset_data, function(x) paste(class(x), collapse = ", "))
+)
+
+
+```
+
+
+4 Initialize MICE and note which variables to not impute. 
+
+```{r}
+# Initialize MICE
+init = mice(subset_data, maxit = 0)
+my_methods = init$method
+pred = make.predictorMatrix(subset_data)
+
+
+# outcomes: don't impute them, but keep as predictors
+pred["GrimAge_EAA", ]  = 0  
+pred["PhenoAge_EAA", ] = 0
+pred["DunedinPACE", ]  = 0
+pred["DNAmIC", ]       = 0
+
+# remove entity_id entirely
+pred[, "entity_id.x"]  = 0
+pred["entity_id.x", ]  = 0
+
+
+# Cell types have no missingness so don't need to be imputed
+# but keep them as predictors (leave their columns as-is)
+pred["CD4nv", ]  = 0
+pred["CD8nv", ]  = 0
+pred["Mono", ]   = 0
+pred["Treg", ]   = 0
+pred["CD4mem", ] = 0
+pred["CD8mem", ] = 0
+pred["NK", ]     = 0
+pred["Bmem", ]   = 0
+pred["Bnv", ]    = 0
+
+
+```
+
+
+5 Assign imputation methods for each variable
+
+```{r}
+# Specify imputation methods for each variable
+
+# --- Do NOT impute these ---
+my_methods["entity_id.x"] = "" # dont impute entity_id
+my_methods["GrimAge_EAA"]      = ""   # outcome - do not impute
+my_methods["PhenoAge_EAA"]     = ""   # outcome - do not impute
+my_methods["DunedinPACE"]      = ""   # outcome - do not impute
+my_methods["DNAmIC"]           = ""   # outcome - do not impute
+
+# cell types - no missingness, do not impute
+my_methods["CD4nv"]   = ""
+my_methods["CD8nv"]   = ""
+my_methods["Mono"]    = ""
+my_methods["Treg"]    = ""
+my_methods["CD4mem"]  = ""
+my_methods["CD8mem"]  = ""
+my_methods["NK"]      = ""
+my_methods["Bmem"]    = ""
+my_methods["Bnv"]     = ""
+
+# --- Impute these ---
+my_methods["AGE_NMBR_COM"]      = "pmm"     # continuous
+my_methods["SEX_ASK_COM"]       = "logreg"  # binary
+my_methods["WGHTS_PROV_COM"]    = "pmm"     # categorical >2 levels -> pmm for stability
+my_methods["Race7"]             = "pmm"     # categorical >2 levels -> pmm for stability
+my_methods["INC_TOT_COM"]       = "pmm"     # ordinal categorical -> pmm for stability
+my_methods["ALC_FREQ_COM"]      = "pmm"     # ordinal categorical -> pmm for stability
+my_methods["ICQ_SMOKE_COM"]     = "pmm"     # categorical >2 levels -> pmm for stability
+my_methods["ENV_HMPRB_CON_MCQ"] = "logreg"  # binary
+my_methods["PA2_DSCR2_MCQ"]     = "pmm"     # continuous
+
+# environmental exposures
+my_methods["pm25_1yr_com"]      = "pmm"     # continuous
+my_methods["no2_1yr_com"]       = "pmm"     # continuous
+my_methods["so2_1yr_com"]       = "pmm"     # continuous
+my_methods["o3_1yr_com"]        = "pmm"     # continuous
+my_methods["GRLANYY_26_COM"]    = "pmm"     # continuous (NDVI)
+
+# tree canopy coverage
+my_methods["grtcc10_01_COM"]    = "pmm"     # continuous
+my_methods["grtcc10_04_COM"]    = "pmm"     # continuous
+
+
+# vegetation coverage
+my_methods["GRUMPYY_01_COM"]    = "pmm"     # continuous
+my_methods["GRUMPYY_04_COM"]    = "pmm"     # continuous
+
+# verify
+my_methods
+```
+
+
+6 Run imputation               
+```{r}
+# Run multiple imputation
+imp_data = mice(subset_data,
+                method = my_methods,
+                predictorMatrix = pred,
+                m = 20,
+                seed = 45,
+                printFlag = TRUE)
+
+# Save the imputed data object
+saveRDS(imp_data, file = "imputed_data_CLSA.rds")
+
+# Extract 20 completed datasets into a list
+completed_list = lapply(1:20, function(i) complete(imp_data, action = i))
+
+# Check NAs are gone in the variables we imputed
+colSums(sapply(completed_list[[1]], is.na))
+```
+
+
+
+```{r}
+library(ggplot2)
+
+# compare observed vs imputed pm25 within province
+comp <- complete(imp_data, "long", include = TRUE)
+comp$imputed <- ifelse(comp$.imp == 0, "Observed", "Imputed")
+
+ggplot(comp[comp$.imp %in% c(0,1,2,3), ], 
+       aes(x = pm25_1yr_com, color = imputed)) +
+  geom_density() +
+  facet_wrap(~WGHTS_PROV_COM, scales = "free")
+
+
+
+# no2
+ggplot(comp[comp$.imp %in% c(0,1,2,3), ], 
+       aes(x = no2_1yr_com, color = imputed)) +
+  geom_density() +
+  facet_wrap(~WGHTS_PROV_COM, scales = "free")
+
+# so2
+ggplot(comp[comp$.imp %in% c(0,1,2,3), ], 
+       aes(x = so2_1yr_com, color = imputed)) +
+  geom_density() +
+  facet_wrap(~WGHTS_PROV_COM, scales = "free")
+
+# o3
+ggplot(comp[comp$.imp %in% c(0,1,2,3), ], 
+       aes(x = o3_1yr_com, color = imputed)) +
+  geom_density() +
+  facet_wrap(~WGHTS_PROV_COM, scales = "free")
+
+
+# Check missingness by province for each pollution variable
+subset_data %>%
+  group_by(WGHTS_PROV_COM) %>%
+  summarise(
+    n_total = n(),
+    n_missing_no2 = sum(is.na(no2_1yr_com)),
+    n_missing_so2 = sum(is.na(so2_1yr_com)),
+    n_missing_o3 = sum(is.na(O3CHGYY_01_COM)),
+    pct_missing_no2 = round(100 * n_missing_no2 / n_total, 1),
+    pct_missing_so2 = round(100 * n_missing_so2 / n_total, 1),
+    pct_missing_o3 = round(100 * n_missing_o3 / n_total, 1)
+  )
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#load imputed data 
+imp_data <- readRDS("imputed_data_CLSA.rds")
+
+completed_list <- lapply(1:20, function(i) complete(imp_data, action = i)) #extract 20 completed datasets into a list 
+
+colSums(is.na(completed_list[[1]])) #check that there are no more NAs 
+#check if convergence was achieved 
+plot(imp_data)
+
+#check if imputed data has plausible values 
+stripplot(imp_data)
+
+
+
+#Air pollution
+densityplot(imp_data, ~pm25_1yr_com)
+densityplot(imp_data, ~no2_1yr_com)
+densityplot(imp_data, ~so2_1yr_com) #21% missing - most important to check 
+densityplot(imp_data, ~o3_1yr_com)
+
+# Greenspace
+densityplot(imp_data, ~GRLANYY_26_COM)    # NDVI
+
+# Tree canopy (all 5 buffers)
+densityplot(imp_data, ~grtcc10_01_COM)
+densityplot(imp_data, ~grtcc10_04_COM)
+
+# Vegetation coverage (all 9 buffers)
+densityplot(imp_data, ~GRUMPYY_01_COM)
+densityplot(imp_data, ~GRUMPYY_04_COM)
+
+# Lifestyle/demographic
+densityplot(imp_data, ~PA2_DSCR2_MCQ)
+stripplot(imp_data, ALC_FREQ_COM ~ .imp)
+stripplot(imp_data, ICQ_SMOKE_COM ~ .imp)
+stripplot(imp_data, INC_TOT_COM ~ .imp)
+stripplot(imp_data, ENV_HMPRB_CON_MCQ ~ .imp)
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

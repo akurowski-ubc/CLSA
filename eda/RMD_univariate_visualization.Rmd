@@ -1,0 +1,494 @@
+---
+title: "Descriptive Statistics, CLSA data, Methylation data set"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+date: "2025-07-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,       # hides code
+  message = FALSE,    # suppresses messages
+  warning = FALSE     # suppresses warnings
+)
+```
+
+
+### Categorical Variables: Descriptive statistics
+Categorical variables were summarized using descriptive statistics. 
+
+```{r}
+
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library (haven)
+library(table1)
+
+# Load data  --------------------------------------------------------------
+
+setwd("C:\\Users\\Amand\\OneDrive\\Documents\\GSAT\\Data") 
+load("CLSA_baseline_and_clocks.rds")#load data
+CLSA_methylation <- CLSA_baseline_and_clocks %>% #create subset with only DNAm data 
+  filter(!is.na(DNAmAge_COM))
+
+# Descriptive stats_predictors_categorical --------------------------------
+
+table(CLSA_methylation$SEX_ASK_COM)#check what categories exist first
+CLSA_methylation$SEX_ASK_COM_factored <- factor(CLSA_methylation$SEX_ASK_COM, #sex
+                                                levels = c("F", "M"),
+                                                labels = c("Female", "Male"))
+
+table(CLSA_methylation$INC_TOT_COM)
+CLSA_methylation$INC_TOT_COM_factored <- factor(CLSA_methylation$INC_TOT_COM,#personal income
+                                                levels = c(1, 2, 3, 4, 5, 7, 8, 9),
+                                                labels = c("<20K",
+                                                           "20K–50K",
+                                                           "50K–100K",
+                                                           "100K–150K",
+                                                           "150K+",
+                                                           "Missing", 
+                                                           "Don't know/No answer",
+                                                           "Refused"))
+
+
+table(CLSA_methylation$INC_PTOT_COM)
+CLSA_methylation$INC_PTOT_COM_factored <- factor(CLSA_methylation$INC_PTOT_COM,#total household income 
+                                                 levels = c(1, 2, 3, 4, 5, 7, 8, 9),
+                                                 labels = c("<20K",
+                                                            "20K–50K",
+                                                            "50K–100K",
+                                                            "100K–150K",
+                                                            "150K+",
+                                                            "Missing", 
+                                                            "Don't know/No answer",
+                                                            "Refused"))
+
+
+table(CLSA_methylation$ED_HIGH_COM)
+CLSA_methylation$ED_HIGH_COM_factored <- factor(CLSA_methylation$ED_HIGH_COM,#education
+                                                levels = c(1, 2, 3, 4, 5, 6, 97, 98, 99),
+                                                labels = c("01 = No post-sec",
+                                                           "02 = Trade cert/diploma",
+                                                           "03 = Non-univ college diploma",
+                                                           "04 = Uni cert below bachelor’s",
+                                                           "05 = Bachelor’s deg",
+                                                           "06 = Above bachelor’s deg",
+                                                           "97 = Other",
+                                                           "98 = Don’t know/No ans",
+                                                           "99 = Refused"))
+
+table(CLSA_methylation$WEA_SVNGSVL_MCQ)
+CLSA_methylation$WEA_SVNGSVL_MCQ_factored <- factor(CLSA_methylation$WEA_SVNGSVL_MCQ,#savings
+                                                    levels = c(1, 2, 3, 4, 8, 9),
+                                                    labels = c("<50K", 
+                                                               "50K–100K",
+                                                               "100K to <$1 million",
+                                                               "$1 million +",
+                                                               "Don't know/No answer",
+                                                               "Refused"))
+table(CLSA_methylation$WEA_DEBT_CCRD_MCQ)
+CLSA_methylation$WEA_DEBT_CCRD_MCQ_factored <- factor(CLSA_methylation$WEA_DEBT_CCRD_MCQ,#debt
+                                                      levels = c(0, 1),
+                                                      labels = c("No", "Yes"))
+
+table(CLSA_methylation$ENV_HMPRB_CON_MCQ)
+CLSA_methylation$ENV_HMPRB_CON_MCQ_factored <- factor(CLSA_methylation$ENV_HMPRB_CON_MCQ,#condensation
+                                                      levels = c(0, 1),
+                                                      labels = c("No", "Yes"))
+
+table(CLSA_methylation$ENV_HMPRB_NOI_MCQ)
+CLSA_methylation$ENV_HMPRB_NOI_MCQ_factored <- factor(CLSA_methylation$ENV_HMPRB_NOI_MCQ,#noise
+                                                      levels = c(0, 1),
+                                                      labels = c("No", "Yes"))
+table(CLSA_methylation$ICQ_SMOKE_COM)
+CLSA_methylation$ICQ_SMOKE_COM_factored <- factor(CLSA_methylation$ICQ_SMOKE_COM,#smoking
+                                                  levels = c(1, 2, 3, -8),
+                                                  labels = c("Currently smoke",
+                                                             "Never smoked",
+                                                             "Former smoker",
+                                                             "Missing"))
+table(CLSA_methylation$ALC_FREQ_COM)
+CLSA_methylation$ALC_FREQ_COM_factored <- factor(CLSA_methylation$ALC_FREQ_COM,
+                                                 levels = c(1, 2, 3, 4, 5, 6, 7, 96, 98, 99, 77),
+                                                 labels = c("Almost q day",
+                                                            "4-5 times/wk",
+                                                            "2-3 times/wk",
+                                                            "Once/wk",
+                                                            "2-3 times/month",
+                                                            "About once/month",
+                                                            "< once/month",
+                                                            "Never",
+                                                            "Don’t know/No answer",
+                                                            "Refused",
+                                                            "Missing"))
+
+CLSA_methylation <- CLSA_methylation %>% #cultural background
+  mutate(Race7 = case_when(
+    SDC_CULT_WH_COM == 1 ~ "White",
+    SDC_CULT_SA_COM == 1 ~ "South Asian",
+    SDC_CULT_BL_COM == 1 ~ "Black",
+    SDC_CULT_FP_COM == 1 | SDC_CULT_SE_COM == 1 | SDC_CULT_WA_COM == 1 |
+      SDC_CULT_JA_COM == 1 | SDC_CULT_KO_COM == 1 | SDC_CULT_ZH_COM == 1 ~ "Asian",
+    SDC_CULT_LA_COM == 1 ~ "Latino",
+    SDC_CULT_AR_COM == 1 ~ "Arab",
+    SDC_CULT_OT_COM == 1 ~ "Other",
+  ))
+
+label(CLSA_methylation$SEX_ASK_COM_factored)           <- "Sex (M/F)"#label categorical variables 
+label(CLSA_methylation$INC_TOT_COM_factored)           <- "Total Personal Income (past 12 months)"
+label(CLSA_methylation$INC_PTOT_COM_factored)          <- "Total Household Income (past 12 months)"
+label(CLSA_methylation$ED_HIGH_COM_factored)           <- "Highest Education Obtained"
+label(CLSA_methylation$WEA_SVNGSVL_MCQ_factored)       <- "Total Savings and Investments"
+label(CLSA_methylation$WEA_DEBT_CCRD_MCQ_factored)     <- "Debt Type: Credit or Store Cards (Yes/No)"
+label(CLSA_methylation$ENV_HMPRB_CON_MCQ_factored)     <- "Home Problems: Condensation"
+label(CLSA_methylation$ENV_HMPRB_NOI_MCQ_factored)     <- "Home Problems: Noise"
+label(CLSA_methylation$ICQ_SMOKE_COM_factored)         <- "Smoking Status"
+label(CLSA_methylation$ALC_FREQ_COM_factored)          <- "Alcohol Consumption Frequency (past 12 months)"
+label(CLSA_methylation$Race7)          <- "Cultural background"
+
+
+table1(~ SEX_ASK_COM_factored + INC_TOT_COM_factored + INC_PTOT_COM_factored + ED_HIGH_COM_factored
+       + WEA_SVNGSVL_MCQ_factored + WEA_DEBT_CCRD_MCQ_factored + ENV_HMPRB_CON_MCQ_factored + ENV_HMPRB_NOI_MCQ_factored
+       + ICQ_SMOKE_COM_factored + ALC_FREQ_COM_factored + Race7
+       , data = CLSA_methylation)
+
+
+```
+
+
+### Categorical Variables: Visualizations
+Categorical variables were visualized using frequency tables and bar plots. 
+
+```{r}
+
+# Visualization_predictors_categorical ------------------------------------
+
+barplot(table(CLSA_methylation$SEX_ASK_COM_factored),
+        main = "Sex Distribution",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.8)
+
+barplot(table(CLSA_methylation$INC_TOT_COM_factored),
+        main = "Total Personal Income",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.6)
+
+
+barplot(table(CLSA_methylation$INC_PTOT_COM_factored),
+        main = "Total Household Income",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.6)
+
+
+barplot(table(CLSA_methylation$ED_HIGH_COM_factored),
+        main = "Highest Education Obtained",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.6)
+
+
+barplot(table(CLSA_methylation$WEA_SVNGSVL_MCQ_factored),
+        main = "Savings",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.6)
+
+
+barplot(table(CLSA_methylation$WEA_DEBT_CCRD_MCQ_factored),
+        main = "Debt",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.6)
+
+barplot(table(CLSA_methylation$ENV_HMPRB_CON_MCQ_factored),
+        main = "Condensation",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.6)
+
+
+barplot(table(CLSA_methylation$ENV_HMPRB_CON_MCQ_factored),
+        main = "Noise",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.6)
+
+
+barplot(table(CLSA_methylation$ICQ_SMOKE_COM_factored),
+        main = "Smoking",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.6)
+
+barplot(table(CLSA_methylation$ALC_FREQ_COM_factored),
+        main = "Alcohol",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.6)
+
+barplot(table(CLSA_methylation$Race7),
+        main = "Cultural background",
+        col = "lightblue",
+        ylab = "Count",
+        las = 2,
+        cex.names = 0.6)
+```
+
+
+### Continuous variables: Descriptive statistics 
+Continuous variables were summarized using descriptive statistics. 
+
+
+
+### Continuous variables: Visualizations 
+Continuous variables were visualized with histograms, density plots, and boxplots.
+
+```{r}
+
+# Visualization_predictors_continuous -------------------------------------
+
+
+#age
+hist(CLSA_methylation$AGE_NMBR_COM,
+     main = "Age in Years",
+     xlab = "Age (years)",
+     col = "skyblue",
+     border = "white")
+
+
+plot(density(CLSA_methylation$AGE_NMBR_COM, na.rm = TRUE),
+     main = "Age in Years",
+     xlab = "Age (years)",
+     col = "darkblue",
+     lwd = 2)
+
+boxplot(CLSA_methylation$AGE_NMBR_COM,
+        main = "Age in Years",
+        ylab = "Age (years)",
+        col = "lightgreen")
+
+
+
+#PM2.5
+hist(CLSA_methylation$pm25_1yr_com,
+     main = "PM2.5 (1-Year Average)",
+     xlab = "PM2.5 (µg/m³)",
+     col = "skyblue",
+     border = "white")
+
+plot(density(CLSA_methylation$pm25_1yr_com, na.rm = TRUE),
+     main = "PM2.5 (1-Year Average)",
+     xlab = "PM2.5 (µg/m³)",
+     col = "darkblue",
+     lwd = 2)
+
+
+boxplot(CLSA_methylation$pm25_1yr_com,
+        main = "PM2.5 (1-Year Average)",
+        ylab = "PM2.5 (µg/m³)",
+        col = "lightgreen")
+
+#NO₂ (1-year average)
+hist(CLSA_methylation$no2_1yr_com,
+     main = "NO2 (1-Year Average)",
+     xlab = "NO2 (µg/m³)",
+     col = "skyblue",
+     border = "white")
+
+plot(density(CLSA_methylation$no2_1yr_com, na.rm = TRUE),
+     main = "NO2 (1-Year Average)",
+     xlab = "NO2 (µg/m³)",
+     col = "darkblue",
+     lwd = 2)
+
+
+boxplot(CLSA_methylation$no2_1yr_com,
+        main = "NO2 (1-Year Average)",
+        ylab = "NO₂ (µg/m³)",
+        col = "lightgreen")
+
+
+
+#ozone (1 y average)
+hist(CLSA_methylation$o3_1yr_com,
+     main = "Ozone (1-Year Average)",
+     xlab = "Ozone (ppb)",
+     col = "skyblue",
+     border = "white")
+
+plot(density(CLSA_methylation$o3_1yr_com, na.rm = TRUE),
+     main = "Ozone (1-Year Average)",
+     xlab = "Ozone (ppb)",
+     col = "darkblue",
+     lwd = 2)
+
+
+boxplot(CLSA_methylation$o3_1yr_com,
+        main = "Ozone (1-Year Average)",
+        ylab = "Ozone (ppb)",
+        col = "lightgreen")
+
+
+#Greenness 
+hist(CLSA_methylation$GRLANYY_26_COM,
+     main = "Greenness",
+     xlab = "Greenness (Max of annual mean NDVI within 250 m)",
+     col = "skyblue",
+     border = "white")
+
+plot(density(CLSA_methylation$GRLANYY_26_COM, na.rm = TRUE),
+     main = "Greenness",
+     xlab = "Greenness",
+     col = "darkblue",
+     lwd = 2)
+
+
+boxplot(CLSA_methylation$GRLANYY_26_COM,
+        main = "Greenness",
+        ylab = "Greenness",
+        col = "lightgreen")
+
+#temperature 
+hist(CLSA_methylation$temp_1yr_com,
+     main = "Temperature (1-Year Average)",
+     xlab = "Temperature (°C)",
+     col = "skyblue",
+     border = "white")
+
+plot(density(CLSA_methylation$temp_1yr_com, na.rm = TRUE),
+     main = "Temperature (1-Year Average)",
+     xlab = "Temperature (°C)",
+     col = "darkblue",
+     lwd = 2)
+
+
+boxplot(CLSA_methylation$temp_1yr_com,
+        main = "Temperature (1-Year Average)",
+        ylab = "Temperature (°C)",
+        col = "lightgreen")
+
+
+#nighttime light brightness 
+hist(CLSA_methylation$LGTNLTYY_01_COM,
+     main = "Nighttime Light Brightness",
+     xlab = "Nighttime Light Brightness",
+     col = "skyblue",
+     border = "white")
+
+plot(density(CLSA_methylation$LGTNLTYY_01_COM, na.rm = TRUE),
+     main = "Nighttime Light Brightness",
+     xlab = "Nighttime Light Brightness",
+     col = "darkblue",
+     lwd = 2)
+
+
+boxplot(CLSA_methylation$LGTNLTYY_01_COM,
+        main = "Nighttime Light Brightness",
+        ylab = "Nighttime Light Brightness",
+        col = "lightgreen")
+
+
+#nighttime brightness - shows that majority of participants have high level of nighttime brightness. keep this. 
+library(ggplot2)
+library(forcats)
+library(dplyr)
+
+CLSA_methylation %>%
+  count(LGTNLTYY_01_COM) %>%
+  arrange(desc(n)) %>%
+  slice_head(n = 10) %>%                # keep top 10 categories
+  ggplot(aes(x = reorder(LGTNLTYY_01_COM, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(x = "Category", y = "Count", 
+       title = "Top 10 Categories of LGTNLTYY_01_COM")
+
+
+CLSA_methylation %>%
+  mutate(LGTNLTYY_01_COM = as.factor(LGTNLTYY_01_COM),
+         LGTNLTYY_grouped = fct_lump_n(LGTNLTYY_01_COM, n = 10)) %>%
+  count(LGTNLTYY_grouped) %>%
+  ggplot(aes(x = reorder(LGTNLTYY_grouped, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(x = "Category", y = "Count", 
+       title = "LGTNLTYY_01_COM (Top 10 + Other)")
+
+#Age at Time of Immigration
+hist(CLSA_methylation$SDC_DAIM_COM_clean,
+     main = "Age at Time of Immigration",
+     xlab = "Age at Time of Immigration (years)",
+     col = "skyblue",
+     border = "white")
+
+plot(density(CLSA_methylation$SDC_DAIM_COM_clean, na.rm = TRUE),
+     main = "Age at Time of Immigration (years)",
+     xlab = "Age at Time of Immigration (years)",
+     col = "darkblue",
+     lwd = 2)
+
+
+boxplot(CLSA_methylation$SDC_DAIM_COM_clean,
+        main = "Age at Time of Immigration",
+        ylab = "Age at Time of Immigration (years)",
+        col = "lightgreen")
+
+#Length of Time in Canada Since Immigration
+hist(CLSA_methylation$SDC_DAIM_COM_clean,
+     main = "Length of Time in Canada Since Immigration",
+     xlab = "Length of Time in Canada Since Immigration (years)",
+     col = "skyblue",
+     border = "white")
+
+plot(density(CLSA_methylation$SDC_DAIM_COM_clean, na.rm = TRUE),
+     main = "Length of Time in Canada Since Immigration",
+     xlab = "Length of Time in Canada Since Immigration (years)",
+     col = "darkblue",
+     lwd = 2)
+
+
+boxplot(CLSA_methylation$SDC_DRES_COM_clean,
+        main = "Length of Time in Canada Since Immigration",
+        ylab = "Length of Time in Canada Since Immigration (years)",
+        col = "lightgreen")
+
+#Length of Time in Canada Since Immigration
+hist(CLSA_methylation$SDC_YACA_YR_COM_clean,
+     main = "Year of Arrival in Canada",
+     xlab = "Year of Arrival in Canada",
+     col = "skyblue",
+     border = "white")
+
+plot(density(CLSA_methylation$SDC_YACA_YR_COM_clean, na.rm = TRUE),
+     main = "Year of Arrival in Canada",
+     xlab = "Year of Arrival in Canada",
+     col = "darkblue",
+     lwd = 2)
+
+
+boxplot(CLSA_methylation$SDC_YACA_YR_COM_clean,
+        main = "Year of Arrival in Canada",
+        ylab = "Year of Arrival in Canada",
+        col = "lightgreen")
+
+```
+
+
+
+
